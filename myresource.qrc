@@ -1,0 +1,22 @@
+<RCC>
+    <qresource prefix="/buttons">
+        <file>images/add_16.png</file>
+        <file>images/add_32.png</file>
+        <file>images/delete_16.png</file>
+        <file>images/delete_32.png</file>
+        <file>images/copying_and_distribution_16.png</file>
+        <file>images/copying_and_distribution_32.png</file>
+        <file>images/pencil_16.png</file>
+        <file>images/pencil_32.png</file>
+        <file>images/vlc_16.png</file>
+        <file>images/vlc_32.png</file>
+        <file>images/move_botom_32.png</file>
+        <file>images/move_bottom_16.png</file>
+        <file>images/move_down_16.png</file>
+        <file>images/move_down_32.png</file>
+        <file>images/move_top_16.png</file>
+        <file>images/move_top_32.png</file>
+        <file>images/move_up_16.png</file>
+        <file>images/move_up_32.png</file>
+    </qresource>
+</RCC>

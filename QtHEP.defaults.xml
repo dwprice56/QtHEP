@@ -1,0 +1,34 @@
+<?xml version="1.0" ?>
+<QtHEP>
+	<Handbrake handBrakeCLI="HandBrakeCLI"/>
+	<Logging Analysis="false" CommandsAndTimestamps="false" Filename=""/>
+	<Options CheckImportShortChapter="false" CheckMP4Audio="false" NumberChapterNames="false" TextImportShortChapter="end of title"/>
+	<NewSource FirstMask="true" FirstPreset="true"/>
+	<FilenameTemplates FilenameTemplateCount="6">
+		<FilenameTemplate Value="&lt;title&gt;.mkv"/>
+		<FilenameTemplate Value="&lt;title&gt; [&lt;preset&gt;][&lt;acodec&gt;].mkv"/>
+		<FilenameTemplate Value="&lt;title&gt; &lt;eptitle&gt; [&lt;preset&gt;][&lt;acodec&gt;].mkv"/>
+		<FilenameTemplate Value="&lt;title&gt; &lt;epno&gt; - &lt;eptitle&gt; [&lt;preset&gt;][&lt;acodec&gt;].mkv"/>
+		<FilenameTemplate Value="&lt;title&gt; &lt;epno&gt; - &lt;cetitle&gt; [&lt;preset&gt;][&lt;acodec&gt;].mkv"/>
+		<FilenameTemplate Value="&lt;title&gt;&lt;epno&gt; - &lt;eptitle&gt; [&lt;preset&gt;][&lt;acodec&gt;].mkv"/>
+	</FilenameTemplates>
+	<FilenameReplacement FilenameCharactersToReplace="\/:*?'&lt;&gt;|" ReplaceFilenameCharacters="true" ReplacementFilenameCharacter="_"/>
+	<AutoCrop AutoCopyCrop="true" AutoResetCrop="true"/>
+	<AutoTitle AutoSelectLongestTitle="true" MinimumTitleSeconds="30"/>
+	<AutoAudioTracks AutoSelect51="true" AutoSelectDTS="false" AutoSelectFallback="true" AutoSelectPreferredLanguage="false" PreferredLanguage=""/>
+	<AutoSubtitle AutoSelectPreferredLanguage="false" AutoSelectSubtitle="true" PreferredLanguage="" SubtitleBurn="false" SubtitleDefault="false"/>
+	<AutoMixdown AC351Primary="None" AC351Secondary="None" AC3Primary="None" AC3Secondary="None" DTSHDPrimary="None" DTSHDSecondary="None" DTSPrimary="None" DTSSecondary="None" OtherPrimary="None" OtherSecondary="None"/>
+	<Presets PresetCount="3">
+		<Preset Name="Film" Settings="--detelecine --decomb --strict-anamorphic --modulus 16 -e x264 -q 20 --vfr --x264-preset=slow   --x264-profile=high --x264-tune=&quot;film&quot;      --h264-level=&quot;4.1&quot; -v 1" Tag="Film"/>
+		<Preset Name="Animation" Settings="--detelecine --decomb --strict-anamorphic --modulus 16 -e x264 -q 20 --vfr --x264-preset=slow   --x264-profile=high --x264-tune=&quot;animation&quot; --h264-level=&quot;4.1&quot; -v 1" Tag="Anime"/>
+		<Preset Name="Trailer" Settings="--detelecine --decomb --strict-anamorphic --modulus 16 -e x264 -q 24 --vfr --x264-preset=medium --x264-profile=main --x264-tune=&quot;film&quot;      --h264-level=&quot;4.1&quot; -v 1" Tag="Trailer"/>
+	</Presets>
+	<Mixdowns MixdownCount="5">
+		<Mixdown Bitrate="0" DRC="0.0" Encoder="copy:ac3" Gain="0" Mixdown="auto" Name="COPYAC3" SampleRate="Auto" Tag="AC3"/>
+		<Mixdown Bitrate="0" DRC="0.0" Encoder="copy:dts" Gain="0" Mixdown="auto" Name="COPYDTS" SampleRate="Auto" Tag="DTS"/>
+		<Mixdown Bitrate="0" DRC="0.0" Encoder="copy:dtshd" Gain="0" Mixdown="auto" Name="COPYDTSHD" SampleRate="Auto" Tag="DTSHD"/>
+		<Mixdown Bitrate="192" DRC="0.0" Encoder="faac" Gain="0" Mixdown="dpl2" Name="HQAAC" SampleRate="Auto" Tag="AAC"/>
+		<Mixdown Bitrate="160" DRC="0.0" Encoder="faac" Gain="0" Mixdown="dpl2" Name="LQAAC" SampleRate="48" Tag="AAC"/>
+	</Mixdowns>
+	<DiscSession AutoDiscSessions="false" AutoDiscSessionsFolder="" AutoDiscSessionsPrefix="" KeepDestination="false" KeepPosition="false" KeepSize="false"/>
+</QtHEP>
