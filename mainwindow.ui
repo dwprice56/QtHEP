@@ -1509,7 +1509,7 @@
             <rect>
              <x>540</x>
              <y>10</y>
-             <width>547</width>
+             <width>541</width>
              <height>250</height>
             </rect>
            </property>
@@ -1526,7 +1526,7 @@
             </size>
            </property>
            <property name="currentIndex">
-            <number>1</number>
+            <number>2</number>
            </property>
            <widget class="QWidget" name="tab_Disc_Title">
             <attribute name="title">
@@ -1590,11 +1590,14 @@
              </item>
              <item row="0" column="1">
               <widget class="QTableWidget" name="tableWidget_Disc_Title_AudioTracks">
+               <property name="editTriggers">
+                <set>QAbstractItemView::NoEditTriggers</set>
+               </property>
                <property name="alternatingRowColors">
                 <bool>true</bool>
                </property>
                <property name="columnCount">
-                <number>1</number>
+                <number>2</number>
                </property>
                <attribute name="verticalHeaderVisible">
                 <bool>false</bool>
@@ -1603,12 +1606,13 @@
                 <number>21</number>
                </attribute>
                <column/>
+               <column/>
               </widget>
              </item>
              <item row="1" column="1">
               <widget class="QTableWidget" name="tableWidget_Disc_Title_SubtitleTracks">
                <property name="columnCount">
-                <number>1</number>
+                <number>2</number>
                </property>
                <attribute name="verticalHeaderVisible">
                 <bool>false</bool>
@@ -1616,6 +1620,7 @@
                <attribute name="verticalHeaderDefaultSectionSize">
                 <number>21</number>
                </attribute>
+               <column/>
                <column/>
               </widget>
              </item>
@@ -1867,6 +1872,312 @@
                <column/>
                <column/>
                <column/>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+           <widget class="QWidget" name="tab_Disc_ChapterRanges">
+            <attribute name="title">
+             <string>Chapter Ranges</string>
+            </attribute>
+            <layout class="QGridLayout" name="gridLayout_13" columnminimumwidth="85,0,0,0">
+             <property name="leftMargin">
+              <number>4</number>
+             </property>
+             <property name="topMargin">
+              <number>0</number>
+             </property>
+             <property name="rightMargin">
+              <number>4</number>
+             </property>
+             <property name="bottomMargin">
+              <number>0</number>
+             </property>
+             <property name="spacing">
+              <number>0</number>
+             </property>
+             <item row="0" column="0">
+              <widget class="QFrame" name="frame_6">
+               <property name="frameShape">
+                <enum>QFrame::NoFrame</enum>
+               </property>
+               <property name="frameShadow">
+                <enum>QFrame::Raised</enum>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_11">
+                <property name="leftMargin">
+                 <number>0</number>
+                </property>
+                <property name="topMargin">
+                 <number>0</number>
+                </property>
+                <property name="rightMargin">
+                 <number>0</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>0</number>
+                </property>
+                <property name="spacing">
+                 <number>0</number>
+                </property>
+                <item row="0" column="0">
+                 <widget class="QRadioButton" name="radioButton_Disc_Title_AllChapters">
+                  <property name="toolTip">
+                   <string>Use all chapters when encoding the video.</string>
+                  </property>
+                  <property name="text">
+                   <string>All</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="1" column="0">
+                 <widget class="QRadioButton" name="radioButton_Disc_Title_ChapterRange">
+                  <property name="toolTip">
+                   <string>Use a limited range of chapters when encoding the video.</string>
+                  </property>
+                  <property name="text">
+                   <string>Range</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="2" column="0">
+                 <widget class="QRadioButton" name="radioButton_Disc_Title_Episodes">
+                  <property name="toolTip">
+                   <string>Encode a series of videos from the chapters.</string>
+                  </property>
+                  <property name="text">
+                   <string>Episodes</string>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="0" column="1">
+              <widget class="QGroupBox" name="groupBox_Disc_Title_ChapterRanges">
+               <property name="maximumSize">
+                <size>
+                 <width>323</width>
+                 <height>59</height>
+                </size>
+               </property>
+               <property name="title">
+                <string>Range</string>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_10">
+                <property name="leftMargin">
+                 <number>4</number>
+                </property>
+                <property name="topMargin">
+                 <number>4</number>
+                </property>
+                <property name="rightMargin">
+                 <number>4</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>4</number>
+                </property>
+                <property name="spacing">
+                 <number>4</number>
+                </property>
+                <item row="0" column="0">
+                 <widget class="QLabel" name="label">
+                  <property name="text">
+                   <string>First</string>
+                  </property>
+                  <property name="buddy">
+                   <cstring>comboBox_Disc_Title_ChapterRange_First</cstring>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <widget class="QComboBox" name="comboBox_Disc_Title_ChapterRange_First">
+                  <property name="toolTip">
+                   <string>Select the first chapter in the range.</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="2">
+                 <spacer name="horizontalSpacer_4">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item row="0" column="3">
+                 <widget class="QLabel" name="label_2">
+                  <property name="text">
+                   <string>Last</string>
+                  </property>
+                  <property name="buddy">
+                   <cstring>comboBox_Disc_Title_chapterRange_Last</cstring>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="4">
+                 <widget class="QComboBox" name="comboBox_Disc_Title_chapterRange_Last">
+                  <property name="toolTip">
+                   <string>Select the last chapter in the range.</string>
+                  </property>
+                 </widget>
+                </item>
+                <item row="0" column="5">
+                 <spacer name="horizontalSpacer_7">
+                  <property name="orientation">
+                   <enum>Qt::Horizontal</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>40</width>
+                    <height>20</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+                <item row="0" column="6">
+                 <widget class="QToolButton" name="toolButton_Disc_Title_ChapterRange_Reset">
+                  <property name="toolTip">
+                   <string>Reset the chapter ranges.</string>
+                  </property>
+                  <property name="text">
+                   <string>...</string>
+                  </property>
+                  <property name="icon">
+                   <iconset>
+                    <normaloff>images/redo_2_16.png</normaloff>images/redo_2_16.png</iconset>
+                  </property>
+                 </widget>
+                </item>
+               </layout>
+              </widget>
+             </item>
+             <item row="0" column="2">
+              <spacer name="horizontalSpacer_8">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>94</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="0" column="3" alignment="Qt::AlignTop">
+              <widget class="QToolButton" name="toolButton_Disc_Title_ChapterRanges_Reset">
+               <property name="toolTip">
+                <string>Reset all of the chapter ranges.</string>
+               </property>
+               <property name="text">
+                <string>...</string>
+               </property>
+               <property name="icon">
+                <iconset>
+                 <normaloff>images/redo_2_16.png</normaloff>images/redo_2_16.png</iconset>
+               </property>
+              </widget>
+             </item>
+             <item row="1" column="0" colspan="4">
+              <widget class="QGroupBox" name="groupBox_Disc_Title_Episodes">
+               <property name="maximumSize">
+                <size>
+                 <width>16777215</width>
+                 <height>141</height>
+                </size>
+               </property>
+               <property name="title">
+                <string>Episodes</string>
+               </property>
+               <layout class="QGridLayout" name="gridLayout_12">
+                <property name="leftMargin">
+                 <number>4</number>
+                </property>
+                <property name="topMargin">
+                 <number>4</number>
+                </property>
+                <property name="rightMargin">
+                 <number>4</number>
+                </property>
+                <property name="bottomMargin">
+                 <number>4</number>
+                </property>
+                <property name="horizontalSpacing">
+                 <number>0</number>
+                </property>
+                <item row="0" column="0">
+                 <widget class="QTableWidget" name="tableWidget_Disc_Title_Episodes">
+                  <property name="columnCount">
+                   <number>3</number>
+                  </property>
+                  <column/>
+                  <column/>
+                  <column/>
+                 </widget>
+                </item>
+                <item row="0" column="1">
+                 <layout class="QVBoxLayout" name="verticalLayout_3">
+                  <property name="spacing">
+                   <number>0</number>
+                  </property>
+                  <property name="sizeConstraint">
+                   <enum>QLayout::SetFixedSize</enum>
+                  </property>
+                  <item>
+                   <widget class="QToolButton" name="toolButton_Disc_Title_AddEpisode">
+                    <property name="text">
+                     <string>...</string>
+                    </property>
+                    <property name="icon">
+                     <iconset>
+                      <normaloff>images/add_16.png</normaloff>images/add_16.png</iconset>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QToolButton" name="toolButton_Disc_Title_CopyEpisode">
+                    <property name="text">
+                     <string>...</string>
+                    </property>
+                    <property name="icon">
+                     <iconset>
+                      <normaloff>images/copying_and_distribution_16.png</normaloff>images/copying_and_distribution_16.png</iconset>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <widget class="QToolButton" name="toolButton_Disc_Title_DeleteEpisode">
+                    <property name="text">
+                     <string>...</string>
+                    </property>
+                    <property name="icon">
+                     <iconset>
+                      <normaloff>images/delete_16.png</normaloff>images/delete_16.png</iconset>
+                    </property>
+                   </widget>
+                  </item>
+                  <item>
+                   <spacer name="verticalSpacer">
+                    <property name="orientation">
+                     <enum>Qt::Vertical</enum>
+                    </property>
+                    <property name="sizeHint" stdset="0">
+                     <size>
+                      <width>20</width>
+                      <height>40</height>
+                     </size>
+                    </property>
+                   </spacer>
+                  </item>
+                 </layout>
+                </item>
+               </layout>
               </widget>
              </item>
             </layout>
