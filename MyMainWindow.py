@@ -52,6 +52,7 @@ from PyQt5Helpers import GetVolumeLabel
 from PyQt5Validators import (QComboBox_NotEmpty_Validator,
     QLineEdit_FolderExists_Validator,
     QLineEdit_NotBlank_Validator)
+from PyQt5SpinBoxDelegate import SpinBoxDelegate
 
 from AppInit import __TESTING_DO_NOT_SAVE_SESSION__
 from AudioTrackStates import AudioTrackState
@@ -444,15 +445,19 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # self.pushButton_Disc_Chapters_ExportChapterNames.clicked.connect(self.onDisc_Chapters_ExportChapterNames)
         # self.pushButton_Disc_Chapters_SetTitleEnd.clicked.connect(self.onDisc_Chapters_SetTitleEnd)
 
+        self.Disc_Title_Episodes_SpinBoxDelegate = SpinBoxDelegate()
+
         self.radioButton_Disc_Title_AllChapters.clicked.connect(self.onDisc_Title_EnbableChapterRangeWidgets)
         self.radioButton_Disc_Title_ChapterRange.clicked.connect(self.onDisc_Title_EnbableChapterRangeWidgets)
         self.radioButton_Disc_Title_Episodes.clicked.connect(self.onDisc_Title_EnbableChapterRangeWidgets)
 
         self.tableWidget_Disc_Title_Episodes.setHorizontalHeaderLabels(['First Chapter', 'Last Chapter', 'Title'])
-        self.tableWidget_Disc_Chapters.resizeColumnsToContents()
-        self.tableWidget_Disc_Chapters.horizontalHeader().setStretchLastSection(True)
-        self.tableWidget_Disc_Chapters.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.tableWidget_Disc_Chapters.verticalHeader().setDefaultSectionSize(21)
+        self.tableWidget_Disc_Title_Episodes.resizeColumnsToContents()
+        self.tableWidget_Disc_Title_Episodes.horizontalHeader().setStretchLastSection(True)
+        self.tableWidget_Disc_Title_Episodes.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.tableWidget_Disc_Title_Episodes.verticalHeader().setDefaultSectionSize(21)
+        self.tableWidget_Disc_Title_Episodes.setItemDelegateForColumn(0, self.Disc_Title_Episodes_SpinBoxDelegate)
+        self.tableWidget_Disc_Title_Episodes.setItemDelegateForColumn(1, self.Disc_Title_Episodes_SpinBoxDelegate)
 
         self.radioButton_Disc_Title_AllChapters.setChecked(True)      # Set this to enable/disable chapter controls
         self.onDisc_Title_EnbableChapterRangeWidgets()
@@ -600,8 +605,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """ Enable/disable the Set Title End button.  It's only enabled if
             the Include Names button is checked and the title has chapters.
         """
-        self.comboBox_Disc_Title_ChapterRange_First.setEnabled(self.radioButton_Disc_Title_ChapterRange.isChecked())
-        self.comboBox_Disc_Title_chapterRange_Last.setEnabled(self.radioButton_Disc_Title_ChapterRange.isChecked())
+        self.spinBox_Disc_Title_ChapterRange_First.setEnabled(self.radioButton_Disc_Title_ChapterRange.isChecked())
+        self.spinBox_Disc_Title_ChapterRange_Last.setEnabled(self.radioButton_Disc_Title_ChapterRange.isChecked())
         self.toolButton_Disc_Title_ChapterRange_Reset.setEnabled(self.radioButton_Disc_Title_ChapterRange.isChecked())
 
         self.tableWidget_Disc_Title_Episodes.setEnabled(self.radioButton_Disc_Title_Episodes.isChecked())
@@ -612,8 +617,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             and self.tableWidget_Disc_Title_Episodes.rowCount() > 0)
 
     def onDisc_Title_EnbableChapterWidgets(self, bool=False):
-        """ Enable/disable the Set Title End button.  It's only enabled if
-            the Include Names button is checked and the title has chapters.
+        """ Enable/disable the widgets associated with chapter editing.
         """
         enableWidgets = (self.tableWidget_Disc_Chapters.rowCount()
             and self.radioButton_Disc_Chapters_IncludeNames.isChecked())
@@ -889,7 +893,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.tableWidget_Disc_Title_SubtitleTracks.resizeColumnToContents(0)
 
-        # Update the chapters table.
+        # Update the chapters widgets.
         # ======================================================================
         if (title.chapters.processChoice == title.chapters.PROCESS_MARKERS):
             self.radioButton_Disc_Chapters_IncludeMarkers.setChecked(True)
@@ -929,6 +933,66 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.onDisc_Title_EnbableChapterWidgets()
 
+        # Update the chapter ranges widgets.
+        # ======================================================================
+        if (title.chapterRanges.processChoice == title.chapterRanges.PROCESS_RANGE):
+            self.radioButton_Disc_Title_ChapterRange.setChecked(True)
+        elif (title.chapterRanges.processChoice == title.chapterRanges.PROCESS_EPISODES):
+            self.radioButton_Disc_Title_Episodes.setChecked(True)
+        else:
+            self.radioButton_Disc_Title_AllChapters.setChecked(True)       # PROCESS_ALL
+
+        self.spinBox_Disc_Title_ChapterRange_First.setMinimum(title.chapters.lowestChapterNumber)
+        self.spinBox_Disc_Title_ChapterRange_Last.setMinimum(title.chapters.lowestChapterNumber)
+
+        self.spinBox_Disc_Title_ChapterRange_First.setMaximum(title.chapters.highestChapterNumber)
+        self.spinBox_Disc_Title_ChapterRange_Last.setMaximum(title.chapters.highestChapterNumber)
+
+        if (title.chapterRanges.firstChapter == 0):
+            self.spinBox_Disc_Title_ChapterRange_First.setValue(title.chapters.lowestChapterNumber)
+        else:
+            self.spinBox_Disc_Title_ChapterRange_First.setValue(title.chapterRanges.firstChapter)
+
+        if (title.chapterRanges.lastChapter == 0):
+            self.spinBox_Disc_Title_ChapterRange_Last.setValue(title.chapters.highestChapterNumber)
+        else:
+            self.spinBox_Disc_Title_ChapterRange_Last.setValue(title.chapterRanges.lastChapter)
+
+        # if (not len(title.chapterRanges.episodes)):
+        #     title.chapterRanges.AddEpisode(1, 2, 'First')
+        #     title.chapterRanges.AddEpisode(3, 4, 'Second')
+        #     title.chapterRanges.AddEpisode(5, 6, 'Third')
+
+        # This works because Python passes class objects by reference.  So, the
+        # delegate for the first and second columns and this attribute are all
+        # the same object.  Remember, a new spinbox is created every time a cell
+        # is edited.
+        self.Disc_Title_Episodes_SpinBoxDelegate.minimum = title.chapters.lowestChapterNumber
+        self.Disc_Title_Episodes_SpinBoxDelegate.maximum = title.chapters.highestChapterNumber
+
+        self.tableWidget_Disc_Title_Episodes.setRowCount(len(title.chapterRanges.episodes))
+        idx = 0
+        for episode in title.chapterRanges.episodes:
+            item = QTableWidgetItem()
+            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
+            item.setData(Qt.EditRole, episode.firstChapter)
+            item.setData(Qt.UserRole, episode)
+            self.tableWidget_Disc_Title_Episodes.setItem(idx, 0, item)
+
+            item = QTableWidgetItem()
+            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
+            item.setData(Qt.EditRole, episode.lastChapter)
+            self.tableWidget_Disc_Title_Episodes.setItem(idx, 1, item)
+
+            item = QTableWidgetItem(episode.title)
+            self.tableWidget_Disc_Title_Episodes.setItem(idx, 2, item)
+
+            idx += 1
+
+        # self.tableWidget_Disc_Title_Episodes.resizeColumnsToContents()
+
+        self.onDisc_Title_EnbableChapterRangeWidgets()
+
     def __TitleDetailsFromWidgets(self):
         """ Update the title details from the title detail widgets.
 
@@ -953,6 +1017,29 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         for idx in range(self.tableWidget_Disc_Chapters.rowCount()):
             chapter = self.tableWidget_Disc_Chapters.item(idx, 0).data(Qt.UserRole)
             chapter.title = self.tableWidget_Disc_Chapters.item(idx, 3).text()
+
+        # Update the chapter ranges widgets.
+        # ======================================================================
+        if (self.radioButton_Disc_Title_AllChapters.isChecked()):
+            title.chapterRanges.processChoice = title.chapterRanges.PROCESS_ALL
+        if (self.radioButton_Disc_Title_ChapterRange.isChecked()):
+            title.chapterRanges.processChoice = title.chapterRanges.PROCESS_RANGE
+        if (self.radioButton_Disc_Title_Episodes.isChecked()):
+            title.chapterRanges.processChoice = title.chapterRanges.PROCESS_EPISODES
+
+        title.chapterRanges.firstChapter = self.spinBox_Disc_Title_ChapterRange_First.value()
+        title.chapterRanges.lastChapter = self.spinBox_Disc_Title_ChapterRange_Last.value()
+
+        print(self.tableWidget_Disc_Title_Episodes.rowCount(), 'title', title.titleNumber)
+        title.chapterRanges.clearEpisodes()
+        for idx in range(self.tableWidget_Disc_Title_Episodes.rowCount()):
+            title.chapterRanges.AddEpisode(
+                self.tableWidget_Disc_Title_Episodes.item(idx, 0).data(Qt.EditRole),
+                self.tableWidget_Disc_Title_Episodes.item(idx, 1).data(Qt.EditRole),
+                self.tableWidget_Disc_Title_Episodes.item(idx, 2).text()
+            )
+
+            print (idx, title.chapterRanges.episodes[idx])
 
     def onEditPreferences(self):
         """Edit the application preferences."""

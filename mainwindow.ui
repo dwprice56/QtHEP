@@ -1509,7 +1509,7 @@
             <rect>
              <x>540</x>
              <y>10</y>
-             <width>541</width>
+             <width>529</width>
              <height>250</height>
             </rect>
            </property>
@@ -1880,23 +1880,20 @@
             <attribute name="title">
              <string>Chapter Ranges</string>
             </attribute>
-            <layout class="QGridLayout" name="gridLayout_13" columnminimumwidth="85,0,0,0">
+            <layout class="QGridLayout" name="gridLayout_13">
              <property name="leftMargin">
-              <number>4</number>
+              <number>5</number>
              </property>
              <property name="topMargin">
-              <number>0</number>
+              <number>5</number>
              </property>
              <property name="rightMargin">
-              <number>4</number>
+              <number>5</number>
              </property>
              <property name="bottomMargin">
-              <number>0</number>
+              <number>5</number>
              </property>
-             <property name="spacing">
-              <number>0</number>
-             </property>
-             <item row="0" column="0">
+             <item row="0" column="0" rowspan="2">
               <widget class="QFrame" name="frame_6">
                <property name="frameShape">
                 <enum>QFrame::NoFrame</enum>
@@ -1953,12 +1950,12 @@
                </layout>
               </widget>
              </item>
-             <item row="0" column="1">
+             <item row="0" column="1" rowspan="2">
               <widget class="QGroupBox" name="groupBox_Disc_Title_ChapterRanges">
                <property name="maximumSize">
                 <size>
-                 <width>323</width>
-                 <height>59</height>
+                 <width>281</width>
+                 <height>69</height>
                 </size>
                </property>
                <property name="title">
@@ -1966,34 +1963,34 @@
                </property>
                <layout class="QGridLayout" name="gridLayout_10">
                 <property name="leftMargin">
-                 <number>4</number>
+                 <number>5</number>
                 </property>
                 <property name="topMargin">
-                 <number>4</number>
+                 <number>5</number>
                 </property>
                 <property name="rightMargin">
-                 <number>4</number>
+                 <number>5</number>
                 </property>
                 <property name="bottomMargin">
-                 <number>4</number>
-                </property>
-                <property name="spacing">
-                 <number>4</number>
+                 <number>5</number>
                 </property>
                 <item row="0" column="0">
-                 <widget class="QLabel" name="label">
+                 <widget class="QLabel" name="label_Disc_Title_ChapterRange_First">
                   <property name="text">
                    <string>First</string>
                   </property>
                   <property name="buddy">
-                   <cstring>comboBox_Disc_Title_ChapterRange_First</cstring>
+                   <cstring>spinBox_Disc_Title_ChapterRange_First</cstring>
                   </property>
                  </widget>
                 </item>
                 <item row="0" column="1">
-                 <widget class="QComboBox" name="comboBox_Disc_Title_ChapterRange_First">
-                  <property name="toolTip">
-                   <string>Select the first chapter in the range.</string>
+                 <widget class="QSpinBox" name="spinBox_Disc_Title_ChapterRange_First">
+                  <property name="alignment">
+                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                  </property>
+                  <property name="minimum">
+                   <number>1</number>
                   </property>
                  </widget>
                 </item>
@@ -2004,26 +2001,29 @@
                   </property>
                   <property name="sizeHint" stdset="0">
                    <size>
-                    <width>20</width>
+                    <width>19</width>
                     <height>20</height>
                    </size>
                   </property>
                  </spacer>
                 </item>
                 <item row="0" column="3">
-                 <widget class="QLabel" name="label_2">
+                 <widget class="QLabel" name="label_Disc_Title_ChapterRange_Last">
                   <property name="text">
                    <string>Last</string>
                   </property>
                   <property name="buddy">
-                   <cstring>comboBox_Disc_Title_chapterRange_Last</cstring>
+                   <cstring>spinBox_Disc_Title_ChapterRange_Last</cstring>
                   </property>
                  </widget>
                 </item>
                 <item row="0" column="4">
-                 <widget class="QComboBox" name="comboBox_Disc_Title_chapterRange_Last">
-                  <property name="toolTip">
-                   <string>Select the last chapter in the range.</string>
+                 <widget class="QSpinBox" name="spinBox_Disc_Title_ChapterRange_Last">
+                  <property name="alignment">
+                   <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                  </property>
+                  <property name="minimum">
+                   <number>1</number>
                   </property>
                  </widget>
                 </item>
@@ -2034,7 +2034,7 @@
                   </property>
                   <property name="sizeHint" stdset="0">
                    <size>
-                    <width>40</width>
+                    <width>39</width>
                     <height>20</height>
                    </size>
                   </property>
@@ -2057,20 +2057,7 @@
                </layout>
               </widget>
              </item>
-             <item row="0" column="2">
-              <spacer name="horizontalSpacer_8">
-               <property name="orientation">
-                <enum>Qt::Horizontal</enum>
-               </property>
-               <property name="sizeHint" stdset="0">
-                <size>
-                 <width>94</width>
-                 <height>20</height>
-                </size>
-               </property>
-              </spacer>
-             </item>
-             <item row="0" column="3" alignment="Qt::AlignTop">
+             <item row="0" column="3">
               <widget class="QToolButton" name="toolButton_Disc_Title_ChapterRanges_Reset">
                <property name="toolTip">
                 <string>Reset all of the chapter ranges.</string>
@@ -2084,7 +2071,20 @@
                </property>
               </widget>
              </item>
-             <item row="1" column="0" colspan="4">
+             <item row="1" column="2">
+              <spacer name="horizontalSpacer_8">
+               <property name="orientation">
+                <enum>Qt::Horizontal</enum>
+               </property>
+               <property name="sizeHint" stdset="0">
+                <size>
+                 <width>114</width>
+                 <height>20</height>
+                </size>
+               </property>
+              </spacer>
+             </item>
+             <item row="2" column="0" colspan="4">
               <widget class="QGroupBox" name="groupBox_Disc_Title_Episodes">
                <property name="maximumSize">
                 <size>
@@ -2094,6 +2094,9 @@
                </property>
                <property name="title">
                 <string>Episodes</string>
+               </property>
+               <property name="flat">
+                <bool>false</bool>
                </property>
                <layout class="QGridLayout" name="gridLayout_12">
                 <property name="leftMargin">
@@ -2116,6 +2119,9 @@
                   <property name="columnCount">
                    <number>3</number>
                   </property>
+                  <attribute name="verticalHeaderVisible">
+                   <bool>false</bool>
+                  </attribute>
                   <column/>
                   <column/>
                   <column/>
