@@ -23,10 +23,12 @@ sys.path.insert(0, '/home/dave/QtProjects/Helpers')
 sys.path.insert(0, '/home/dave/QtProjects/DiscData')
 
 # from PyQt5.QtWidgets import QTreeWidgetItem
+from PyQt5.QtGui import QIcon
 # from PyQt5.QtGui import QString
 from PyQt5.QtCore import Qt
 from PyQt5.QtCore import QProcess
-from PyQt5.QtWidgets import (QApplication,
+from PyQt5.QtWidgets import (
+    QApplication,
     QCheckBox,
     QFileDialog,
     QHBoxLayout,
@@ -35,34 +37,46 @@ from PyQt5.QtWidgets import (QApplication,
     QMainWindow,
     QMessageBox,
     QTableWidgetItem,
-    QWidget)
+    QWidget
+)
 
 from mainwindowui import Ui_MainWindow
 from PreferencesDialog import PreferencesDialog
-from PyQt5WidgetDataConnectors import (WidgetDataConnectors,
+from PyQt5WidgetDataConnectors import (
+    WidgetDataConnectors,
     QCheckBoxDataConnector,
     QComboBoxDataConnector,
     QLineEditDataConnector,
     QPlainTextEditDataConnector,
     QRadioButtonGroupDataConnector,
-    QSpinBoxDataConnector)
+    QSpinBoxDataConnector
+)
 
 from PyQt5OverrideCursor import QWaitCursor
-from PyQt5Helpers import GetVolumeLabel
-from PyQt5Validators import (QComboBox_NotEmpty_Validator,
+from PyQt5Helpers import (
+    GetVolumeLabel,
+    AddItemToTableWidgetCell
+)
+from PyQt5Validators import (
+    QComboBox_NotEmpty_Validator,
     QLineEdit_FolderExists_Validator,
-    QLineEdit_NotBlank_Validator)
+    QLineEdit_NotBlank_Validator
+)
 from PyQt5SpinBoxDelegate import SpinBoxDelegate
 
 from AppInit import __TESTING_DO_NOT_SAVE_SESSION__
 from AudioTrackStates import AudioTrackState
-from Disc import (Disc,
+from Disc import (
+    Disc,
     DiscFilenameTemplatesSingleton,
-    DiscPresetsSingleton)
+    DiscPresetsSingleton
+)
 from SingletonLog import SingletonLog
 from SubtitleTrackStates import SubtitleTrackState
-from Titles import (Titles,
-    TitleVisibleSingleton)
+from Titles import (
+    Titles,
+    TitleVisibleSingleton
+)
 from PyHelpers import NormalizeFileName
 
 def BoolToQtChecked(arg):
@@ -80,6 +94,9 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         super(MyMainWindow, self).__init__(parent)
         self.setupUi(self)
 
+        self.highlightedTabIcon = QIcon('images/draw_ellipse_16.png')
+        # self.highlightedTabIcon = QIcon('images/diamond_16.png')
+        
         self.__widgetDataConnectors = WidgetDataConnectors()
 
         self.actionBrowse_for_Video.triggered.connect(self.onDisc_Source_Browse)
@@ -374,47 +391,35 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """
         # The table displaying the list of disc titles.
         # ======================================================================
-        self.tableWidget_Disc_Titles.setHorizontalHeaderLabels(['Select',
-            'Title #', 'Duration', 'Aspect', 'Title Name'])
-        self.tableWidget_Disc_Titles.resizeColumnsToContents()
-        self.tableWidget_Disc_Titles.horizontalHeader().setStretchLastSection(True)
-        self.tableWidget_Disc_Titles.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.tableWidget_Disc_Titles.verticalHeader().setDefaultSectionSize(21)
-        self.tableWidget_Disc_Titles.itemSelectionChanged.connect(self.onDisc_Titles_ItemSelectionChanged)
+        self.__StandardTableWidgetInitialization(self.tableWidget_Disc_Titles,
+            ['Select', 'Title #', 'Duration', 'Aspect', 'Title Name'])
 
+        self.tableWidget_Disc_Titles.itemSelectionChanged.connect(self.onDisc_Titles_ItemSelectionChanged)
         self.tableWidget_Disc_Titles.currentItemChanged.connect(self.onDisc_Titles_CurrentItemChanged)
 
         # The table displaying the detail information for the selected title.
         # ======================================================================
-        self.tableWidget_Disc_Title.setHorizontalHeaderLabels(['Track', ''])
-
         idx = 0
         for label in ['vts:', 'ttn:', 'cells:', 'blocks:', 'duration:', 'size:',
             'pixel aspect:', 'display aspect:', 'fps:', 'autocrop:']:
-            self.tableWidget_Disc_Title.setItem(idx, 0, QTableWidgetItem(label))
-            self.tableWidget_Disc_Title.setItem(idx, 1, QTableWidgetItem(''))
-            self.tableWidget_Disc_Title.item(idx, 1).setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Title, idx, 0,
+                label, textAlignment=None, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Title, idx, 1,
+                '', readOnly=True)
             idx += 1
-        self.tableWidget_Disc_Title.resizeColumnsToContents()
-        self.tableWidget_Disc_Title.horizontalHeader().setStretchLastSection(True)
-        self.tableWidget_Disc_Title.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.tableWidget_Disc_Title.verticalHeader().setDefaultSectionSize(21)
+
+        self.__StandardTableWidgetInitialization(self.tableWidget_Disc_Title,
+            ['Track', ''])
 
         # The table displaying the list of audio tracks for the selected disc title.
         # ======================================================================
-        self.tableWidget_Disc_Title_AudioTracks.setHorizontalHeaderLabels([' # ', 'Audio Tracks'])
-        self.tableWidget_Disc_Title_AudioTracks.horizontalHeader().setStretchLastSection(True)
-        self.tableWidget_Disc_Title_AudioTracks.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.tableWidget_Disc_Title_AudioTracks.verticalHeader().setDefaultSectionSize(21)
-        self.tableWidget_Disc_Title_AudioTracks.resizeColumnsToContents()
+        self.__StandardTableWidgetInitialization(self.tableWidget_Disc_Title_AudioTracks,
+            [' # ', 'Audio Tracks'])
 
         # The table displaying the list of subtitle tracks for the selected title.
         # ======================================================================
-        self.tableWidget_Disc_Title_SubtitleTracks.setHorizontalHeaderLabels([' # ', 'Subtitle Tracks'])
-        self.tableWidget_Disc_Title_SubtitleTracks.horizontalHeader().setStretchLastSection(True)
-        self.tableWidget_Disc_Title_SubtitleTracks.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.tableWidget_Disc_Title_SubtitleTracks.verticalHeader().setDefaultSectionSize(21)
-        self.tableWidget_Disc_Title_SubtitleTracks.resizeColumnsToContents()
+        self.__StandardTableWidgetInitialization(self.tableWidget_Disc_Title_SubtitleTracks,
+            [' # ', 'Subtitle Tracks'])
 
         # The table displaying the list of chapters for the selected title.
         # ======================================================================
@@ -428,41 +433,33 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.radioButton_Disc_Chapters_IncludeMarkers.clicked.connect(self.onDisc_Title_EnbableChapterWidgets)
         self.radioButton_Disc_Chapters_IncludeNames.clicked.connect(self.onDisc_Title_EnbableChapterWidgets)
 
-        self.tableWidget_Disc_Chapters.setHorizontalHeaderLabels(['Chapter #', 'Cells', 'Duration', 'Chapter Name'])
-        self.tableWidget_Disc_Chapters.resizeColumnsToContents()
-        self.tableWidget_Disc_Chapters.horizontalHeader().setStretchLastSection(True)
-        self.tableWidget_Disc_Chapters.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.tableWidget_Disc_Chapters.verticalHeader().setDefaultSectionSize(21)
+        self.__StandardTableWidgetInitialization(self.tableWidget_Disc_Chapters,
+            ['Chapter #', 'Cells', 'Duration', 'Chapter Name'])
 
         self.radioButton_Disc_Chapters_IncludeMarkers.setChecked(True)      # Set this to enable/disable chapter controls
         self.onDisc_Title_EnbableChapterWidgets()
 
         # The widgets displaying the chapter ranges and episodes for the selected title.
         # ======================================================================
-        # self.toolButton_Disc_Chapters_ResetFirstChapter.clicked.connect(self.onDisc_Chapters_ResetFirstChapter)
-        # self.pushButton_Disc_Chapters_ImportChapterNames.clicked.connect(self.onDisc_Chapters_ImportChapterNames)
-        # self.pushButton_Disc_Chapters_ResetNames.clicked.connect(self.onDisc_Chapters_ResetNames)
-        # self.pushButton_Disc_Chapters_ExportChapterNames.clicked.connect(self.onDisc_Chapters_ExportChapterNames)
-        # self.pushButton_Disc_Chapters_SetTitleEnd.clicked.connect(self.onDisc_Chapters_SetTitleEnd)
+        self.toolButton_Disc_Title_ChapterRange_Reset.clicked.connect(self.onDisc_Title_ChapterRange_Reset)
+        self.toolButton_Disc_Title_AddEpisode.clicked.connect(self.onDisc_Title_AddEpisode)
+        self.toolButton_Disc_Title_CopyEpisode.clicked.connect(self.onDisc_Title_CopyEpisode)
+        self.toolButton_Disc_Title_DeleteEpisode.clicked.connect(self.onDisc_Title_DeleteEpisode)
+        self.toolButton_Disc_Title_Episodes_DeleteAll.clicked.connect(self.onButton_Disc_Title_Episodes_DeleteAll)
+
+        self.radioButton_Disc_Title_AllChapters.clicked.connect(self.onDisc_Title_EnableChapterRangeWidgets)
+        self.radioButton_Disc_Title_ChapterRange.clicked.connect(self.onDisc_Title_EnableChapterRangeWidgets)
+        self.radioButton_Disc_Title_Episodes.clicked.connect(self.onDisc_Title_EnableChapterRangeWidgets)
+
+        self.__StandardTableWidgetInitialization(self.tableWidget_Disc_Title_Episodes,
+            ['First Chapter', 'Last Chapter', 'Title'])
 
         self.Disc_Title_Episodes_SpinBoxDelegate = SpinBoxDelegate()
-
-        self.radioButton_Disc_Title_AllChapters.clicked.connect(self.onDisc_Title_EnbableChapterRangeWidgets)
-        self.radioButton_Disc_Title_ChapterRange.clicked.connect(self.onDisc_Title_EnbableChapterRangeWidgets)
-        self.radioButton_Disc_Title_Episodes.clicked.connect(self.onDisc_Title_EnbableChapterRangeWidgets)
-
-        self.tableWidget_Disc_Title_Episodes.setHorizontalHeaderLabels(['First Chapter', 'Last Chapter', 'Title'])
-        self.tableWidget_Disc_Title_Episodes.resizeColumnsToContents()
-        self.tableWidget_Disc_Title_Episodes.horizontalHeader().setStretchLastSection(True)
-        self.tableWidget_Disc_Title_Episodes.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.tableWidget_Disc_Title_Episodes.verticalHeader().setDefaultSectionSize(21)
         self.tableWidget_Disc_Title_Episodes.setItemDelegateForColumn(0, self.Disc_Title_Episodes_SpinBoxDelegate)
         self.tableWidget_Disc_Title_Episodes.setItemDelegateForColumn(1, self.Disc_Title_Episodes_SpinBoxDelegate)
 
         self.radioButton_Disc_Title_AllChapters.setChecked(True)      # Set this to enable/disable chapter controls
-        self.onDisc_Title_EnbableChapterRangeWidgets()
-
-
+        self.onDisc_Title_EnableChapterRangeWidgets()
 
     @property
     def disc(self):
@@ -473,6 +470,21 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     def preferences(self):
         """ Return the preferences object."""
         return QApplication.instance().preferences
+
+    def activeTitle(self, warnIfNone=True):
+        """ Returns the currently active title.
+
+            The active title is attached to the first cell in the
+            tableWidget_Disc_Title widget as UserRoll data.
+
+            If warnIfNone is True (the default) a warning message will be
+            displayed when a title does not exist.
+        """
+        title = self.tableWidget_Disc_Title.item(0, 0).data(Qt.UserRole)
+        if (title is None and warnIfNone):
+            QMessageBox.warning(self, 'Title Not Selected', 'Please select a title first.')
+
+        return title
 
     def Load_Disc_FilenameTemplates(self):
         """ Load the filename templates QComboBox from the preferences.
@@ -539,6 +551,18 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.comboBox_Disc_SubtitleTracks_SelectTrack_Second.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
         self.comboBox_Disc_SubtitleTracks_SelectTrack_Third.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
 
+    def __NewEpisodeToTable(self, idx, episode):
+        """ Insert a new episode in the tableWidget_Disc_Title_Episodes table.
+
+            The talbe row (idx) must already exist.
+        """
+        AddItemToTableWidgetCell(self.tableWidget_Disc_Title_Episodes, idx, 0,
+            episode.firstChapter, data=episode)
+        AddItemToTableWidgetCell(self.tableWidget_Disc_Title_Episodes, idx, 1,
+            episode.lastChapter)
+        AddItemToTableWidgetCell(self.tableWidget_Disc_Title_Episodes, idx, 2,
+            episode.title, textAlignment=None)
+
     def onDisc_Chapters_ExportChapterNames(self):
         """ Export the chapter names to a text file.
         """
@@ -587,7 +611,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
                 head, tail = line.rstrip("\r\n").split("=", 1)
                 if (head.endswith("NAME")):
-                    self.tableWidget_Disc_Chapters.item(idx, 3).setText(tail)
+                    self.tableWidget_Disc_Chapters.item(idx, 3).setData(Qt.EditRole, tail)
                     idx += 1
 
         if (self.preferences.options.checkImportShortChapter):
@@ -595,16 +619,130 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             chapter = self.tableWidget_Disc_Chapters.item(idx, 0).data(Qt.UserRole)
 
             if (chapter.isShortChapter and chapter.isDefaultName):
-                self.tableWidget_Disc_Chapters.item(idx, 3).setText(self.preferences.options.textImportShortChapter)
+                self.tableWidget_Disc_Chapters.item(idx, 3).setData(Qt.EditRole, self.preferences.options.textImportShortChapter)
 
         self.radioButton_Disc_Chapters_IncludeNames.setChecked(True)
+        self.onDisc_Title_EnbableChapterWidgets()
 
         self.statusBar.showMessage('Chapter names imported from {}.'.format(result[0]), 15000)
 
-    def onDisc_Title_EnbableChapterRangeWidgets(self, bool=False):
+    # TODO When enabling/disabling the All/Range/Episode radio buttons don't enable
+    # the buttons if self.activeTitle() is None.
+
+    def onDisc_Title_AddEpisode(self):
+        """ Add a chapter episode.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        episode = title.chapterRanges.AddEpisode(title.chapters.lowestChapterNumber,
+            title.chapters.highestChapterNumber, 'new episode')
+
+        idx = self.tableWidget_Disc_Title_Episodes.rowCount()
+        self.tableWidget_Disc_Title_Episodes.setRowCount(idx + 1)
+
+        self.__NewEpisodeToTable(idx, episode)
+
+        # If row count was zero enable the range copy/delete buttons.
+        if (idx == 0):
+            self.onDisc_Title_EnableChapterRangeWidgets()
+
+        self.statusBar.showMessage('1 episode added.', 15000)
+
+    def onDisc_Title_CopyEpisode(self):
+        """ Copy a chapter episode.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        idx = self.tableWidget_Disc_Title_Episodes.currentRow()
+        if (idx < 0):
+            QMessageBox.warning(self, 'Episode Not Selected', 'Please select an episode first.')
+            return
+
+        episode = title.chapterRanges.AddEpisode(
+            self.tableWidget_Disc_Title_Episodes.item(idx, 0).data(Qt.EditRole),
+            self.tableWidget_Disc_Title_Episodes.item(idx, 1).data(Qt.EditRole),
+            self.tableWidget_Disc_Title_Episodes.item(idx, 2).text()
+        )
+
+        idx = self.tableWidget_Disc_Title_Episodes.rowCount()
+        self.tableWidget_Disc_Title_Episodes.setRowCount(idx + 1)
+
+        self.__NewEpisodeToTable(idx, episode)
+
+        self.statusBar.showMessage('1 episode copied.', 15000)
+
+    def onDisc_Title_ChapterRange_Reset(self):
+        """ Reset the chapter ranges for the selected title.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        self.spinBox_Disc_Title_ChapterRange_First.setValue(title.chapters.lowestChapterNumber)
+        self.spinBox_Disc_Title_ChapterRange_Last.setValue(title.chapters.highestChapterNumber)
+
+        self.statusBar.showMessage('Chapter ranges reset.', 15000)
+
+    def onDisc_Title_DeleteEpisode(self):
+        """ Delete an episode from a titles.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        idx = self.tableWidget_Disc_Title_Episodes.currentRow()
+        if (idx < 0):
+            QMessageBox.warning(self, 'Episode Not Selected', 'Please select an episode first.')
+            return
+
+        episode = self.tableWidget_Disc_Title_Episodes.item(idx, 0).data(Qt.UserRole)
+        title.chapterRanges.remove(episode)
+        self.tableWidget_Disc_Title_Episodes.removeRow(idx)
+
+        # If row count was zero enable the range copy/delete buttons.
+        if (not self.tableWidget_Disc_Title_Episodes.rowCount()):
+            self.onDisc_Title_EnableChapterRangeWidgets()
+
+        self.statusBar.showMessage('1 episode deleted.', 15000)
+
+    def onButton_Disc_Title_Episodes_DeleteAll(self):
+        """ Delete all the episodes for the active title.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        rowCount = self.tableWidget_Disc_Title_Episodes.rowCount()
+
+        result = QMessageBox.question(self, 'Delete All Episodes',
+            'Are you sure you want to delete all {} episodes?'.format(rowCount))
+        if (result != QMessageBox.Yes):
+            return
+
+        title.chapterRanges.clearEpisodes()
+        self.tableWidget_Disc_Title_Episodes.setRowCount(0)
+        self.onDisc_Title_EnableChapterRangeWidgets()
+
+        self.statusBar.showMessage('{} episodes deleted.'.format(rowCount), 15000)
+
+    def onDisc_Title_EnableChapterRangeWidgets(self, bool=False):
         """ Enable/disable the Set Title End button.  It's only enabled if
             the Include Names button is checked and the title has chapters.
         """
+        rowCount = self.tableWidget_Disc_Chapters.rowCount()
+
+        self.radioButton_Disc_Title_AllChapters.setEnabled(rowCount)
+        self.radioButton_Disc_Title_ChapterRange.setEnabled(rowCount)
+        self.radioButton_Disc_Title_Episodes.setEnabled(rowCount)
+
+        # self.spinBox_Disc_Title_ChapterRange_First.setEnabled(rowCount)
+        # self.spinBox_Disc_Title_ChapterRange_First.setEnabled(rowCount)
+        # self.toolButton_Disc_Chapters_ResetFirstChapter.setEnabled(rowCount)
+
         self.spinBox_Disc_Title_ChapterRange_First.setEnabled(self.radioButton_Disc_Title_ChapterRange.isChecked())
         self.spinBox_Disc_Title_ChapterRange_Last.setEnabled(self.radioButton_Disc_Title_ChapterRange.isChecked())
         self.toolButton_Disc_Title_ChapterRange_Reset.setEnabled(self.radioButton_Disc_Title_ChapterRange.isChecked())
@@ -615,11 +753,27 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             and self.tableWidget_Disc_Title_Episodes.rowCount() > 0)
         self.toolButton_Disc_Title_DeleteEpisode.setEnabled(self.radioButton_Disc_Title_Episodes.isChecked()
             and self.tableWidget_Disc_Title_Episodes.rowCount() > 0)
+        self.toolButton_Disc_Title_Episodes_DeleteAll.setEnabled(self.radioButton_Disc_Title_Episodes.isChecked()
+            and self.tableWidget_Disc_Title_Episodes.rowCount() > 0)
+
+        if (self.radioButton_Disc_Title_AllChapters.isChecked()):
+            self.tabWidget_Disc.setTabIcon(2, QIcon())
+        else:
+            self.tabWidget_Disc.setTabIcon(2, self.highlightedTabIcon)
 
     def onDisc_Title_EnbableChapterWidgets(self, bool=False):
         """ Enable/disable the widgets associated with chapter editing.
         """
-        enableWidgets = (self.tableWidget_Disc_Chapters.rowCount()
+        rowCount = self.tableWidget_Disc_Chapters.rowCount()
+
+        self.radioButton_Disc_Chapters_NoMarkers.setEnabled(rowCount)
+        self.radioButton_Disc_Chapters_IncludeMarkers.setEnabled(rowCount)
+        self.radioButton_Disc_Chapters_IncludeNames.setEnabled(rowCount)
+
+        self.spinBox_Disc_Chapters_FirstChapter.setEnabled(rowCount)
+        self.toolButton_Disc_Chapters_ResetFirstChapter.setEnabled(rowCount)
+
+        enableWidgets = (rowCount
             and self.radioButton_Disc_Chapters_IncludeNames.isChecked())
 
         self.pushButton_Disc_Chapters_ImportChapterNames.setEnabled(self.tableWidget_Disc_Chapters.rowCount())
@@ -630,18 +784,29 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.tableWidget_Disc_Chapters.setEnabled(enableWidgets)
 
+        if (self.radioButton_Disc_Chapters_IncludeMarkers.isChecked()):
+            self.tabWidget_Disc.setTabIcon(1, QIcon())
+        else:
+            self.tabWidget_Disc.setTabIcon(1, self.highlightedTabIcon)
+
+    # TODO add status bar messages for lots of actions
+
     def onDisc_Chapters_ResetFirstChapter(self):
         """ Reset the first chapter number.
         """
         self.spinBox_Disc_Chapters_FirstChapter.setValue(1)
+
         self.statusBar.showMessage('First chapter number reset to 1.', 15000)
+
+    # TODO refactor method names, especially buttons | onDisc_Chapters_ResetNames becomes onButton_Disc_Chapters_ResetNames
+    # TODO onSignal, etc.
 
     def onDisc_Chapters_ResetNames(self):
         """ Reset the chapter names to their default values.
         """
         for idx in range(self.tableWidget_Disc_Chapters.rowCount()):
             chapter = self.tableWidget_Disc_Chapters.item(idx, 0).data(Qt.UserRole)
-            self.tableWidget_Disc_Chapters.item(idx, 3).setText(chapter.defaultName)
+            self.tableWidget_Disc_Chapters.item(idx, 3).setData(Qt.EditRole, chapter.defaultName)
 
         self.statusBar.showMessage('Chapter names reset.', 15000)
 
@@ -664,7 +829,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             if (result != QMessageBox.Yes):
                 return
 
-        self.tableWidget_Disc_Chapters.item(idx, 3).setText(self.preferences.options.textImportShortChapter)
+        self.tableWidget_Disc_Chapters.item(idx, 3).setData(Qt.EditRole, self.preferences.options.textImportShortChapter)
 
         self.statusBar.showMessage('The name for chapter {} was set to {}.'.format(chapter.chapterNumber,
             self.preferences.options.textImportShortChapter), 15000)
@@ -672,7 +837,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     def onDisc_Destination_Browse(self):
         """ Select a folder where the transcoded video files will be saved.
         """
-
         destinationFolder = QFileDialog.getExistingDirectory(self,
             'Select Destination Folder', self.lineEdit_Disc_Destination.text())
         if (not destinationFolder):
@@ -761,7 +925,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """ Find a video folder with containing a copy of a DVD or BluRay disc
             and read the disc with Handbrake.  Then parse the disc information.
         """
-
         sourceFolder = QFileDialog.getExistingDirectory(self,
             'Select Video Folder', self.lineEdit_Disc_Source.text())
         if (not sourceFolder):
@@ -782,7 +945,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """ Find a video folder with containing a copy of a DVD or BluRay disc.
             DO NOT read the disc with Handbrake.  DO NOT parse the disc information.
         """
-
         sourceFolder = QFileDialog.getExistingDirectory(self,
             'Find Video Folder', self.lineEdit_Disc_Source.text())
         if (not sourceFolder):
@@ -828,11 +990,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     def onDisc_Titles_ItemSelectionChanged(self):
         """ Triggered when a new title is selected.
         """
-
-        print ('row', self.tableWidget_Disc_Titles.currentRow())
-
         self.__TitleDetailsFromWidgets()
-
 
         currentItem = self.tableWidget_Disc_Titles.currentItem()
         if (currentItem is None):       # This will be None if we're here because the selected row was deleted.
@@ -841,6 +999,17 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         title = self.tableWidget_Disc_Titles.item(currentItem.row(), 0).data(Qt.UserRole)
         self.__TitleDetailsToWidgets(title)
 
+    def __StandardTableWidgetInitialization(self, tableWidget, horizontalHeaderLabels=None):
+        """ Standard initialization for a QTableWidget.
+        """
+        if (horizontalHeaderLabels is not None):
+            tableWidget.setHorizontalHeaderLabels(horizontalHeaderLabels)
+            tableWidget.resizeColumnsToContents()
+            tableWidget.horizontalHeader().setStretchLastSection(True)
+
+        tableWidget.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        tableWidget.verticalHeader().setDefaultSectionSize(21)
+
     def __TitleDetailsToWidgets(self, title):
         """ Update the title detail widgets from the title.
         """
@@ -848,16 +1017,16 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # ======================================================================
         self.tableWidget_Disc_Title.item(0, 0).setData(Qt.UserRole, title)
 
-        self.tableWidget_Disc_Title.item(0, 1).setText(str(title.vts))
-        self.tableWidget_Disc_Title.item(1, 1).setText(str(title.ttn))
-        self.tableWidget_Disc_Title.item(2, 1).setText(title.cellsRange)
-        self.tableWidget_Disc_Title.item(3, 1).setText(str(title.blocks))
-        self.tableWidget_Disc_Title.item(4, 1).setText(str(title.duration))
-        self.tableWidget_Disc_Title.item(5, 1).setText(title.sizeRange)
-        self.tableWidget_Disc_Title.item(6, 1).setText(title.pixelAspectRatio)
-        self.tableWidget_Disc_Title.item(7, 1).setText(str(title.displayAspectRatio))
-        self.tableWidget_Disc_Title.item(8, 1).setText(str(title.framesPerSecond))
-        self.tableWidget_Disc_Title.item(9, 1).setText(title.autoCrop.asString)
+        self.tableWidget_Disc_Title.item(0, 1).setData(Qt.EditRole, title.vts)
+        self.tableWidget_Disc_Title.item(1, 1).setData(Qt.EditRole, title.ttn)
+        self.tableWidget_Disc_Title.item(2, 1).setData(Qt.EditRole, title.cellsRange)
+        self.tableWidget_Disc_Title.item(3, 1).setData(Qt.EditRole, title.blocks)
+        self.tableWidget_Disc_Title.item(4, 1).setData(Qt.EditRole, title.duration)
+        self.tableWidget_Disc_Title.item(5, 1).setData(Qt.EditRole, title.sizeRange)
+        self.tableWidget_Disc_Title.item(6, 1).setData(Qt.EditRole, title.pixelAspectRatio)
+        self.tableWidget_Disc_Title.item(7, 1).setData(Qt.EditRole, title.displayAspectRatio)
+        self.tableWidget_Disc_Title.item(8, 1).setData(Qt.EditRole, title.framesPerSecond)
+        self.tableWidget_Disc_Title.item(9, 1).setData(Qt.EditRole, title.autoCrop.asString)
 
         # Update the title audio tracks table.
         # ======================================================================
@@ -865,12 +1034,10 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         idx = 0
         for audioTrack in title.audioTracks:
-            item = QTableWidgetItem(str(audioTrack.trackNumber))
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            self.tableWidget_Disc_Title_AudioTracks.setItem(idx, 0, item)
-
-            item = QTableWidgetItem(audioTrack.description)
-            self.tableWidget_Disc_Title_AudioTracks.setItem(idx, 1, item)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Title_AudioTracks,
+                idx, 0, audioTrack.trackNumber, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Title_AudioTracks,
+                idx, 1, audioTrack.description, textAlignment=None, readOnly=True)
 
             idx += 1
 
@@ -882,12 +1049,10 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         idx = 0
         for subtitleTrack in title.subtitleTracks:
-            item = QTableWidgetItem(str(subtitleTrack.trackNumber))
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            self.tableWidget_Disc_Title_SubtitleTracks.setItem(idx, 0, item)
-
-            item = QTableWidgetItem(subtitleTrack.description)
-            self.tableWidget_Disc_Title_SubtitleTracks.setItem(idx, 1, item)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Title_SubtitleTracks,
+                idx, 0, subtitleTrack.trackNumber, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Title_SubtitleTracks,
+                idx, 1, subtitleTrack.description, textAlignment=None, readOnly=True)
 
             idx += 1
 
@@ -907,25 +1072,14 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.tableWidget_Disc_Chapters.setRowCount(len(title.chapters))
         idx = 0
         for chapter in title.chapters:
-
-            item = QTableWidgetItem(str(chapter.chapterNumber))
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            item.setData(Qt.UserRole, chapter)
-            self.tableWidget_Disc_Chapters.setItem(idx, 0, item)
-
-            item = QTableWidgetItem('{}:{}'.format(chapter.cells[0], chapter.cells[1]))
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            self.tableWidget_Disc_Chapters.setItem(idx, 1, item)
-
-            item = QTableWidgetItem(chapter.duration)
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            self.tableWidget_Disc_Chapters.setItem(idx, 2, item)
-
-            item = QTableWidgetItem(chapter.title)
-            self.tableWidget_Disc_Chapters.setItem(idx, 3, item)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Chapters, idx, 0,
+                chapter.chapterNumber, data=chapter, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Chapters, idx, 1,
+                chapter.cellsString, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Chapters, idx, 2,
+                chapter.duration, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Chapters, idx, 3,
+                chapter.title, textAlignment=None)
 
             idx += 1
 
@@ -973,33 +1127,19 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.tableWidget_Disc_Title_Episodes.setRowCount(len(title.chapterRanges.episodes))
         idx = 0
         for episode in title.chapterRanges.episodes:
-            item = QTableWidgetItem()
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            item.setData(Qt.EditRole, episode.firstChapter)
-            item.setData(Qt.UserRole, episode)
-            self.tableWidget_Disc_Title_Episodes.setItem(idx, 0, item)
-
-            item = QTableWidgetItem()
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            item.setData(Qt.EditRole, episode.lastChapter)
-            self.tableWidget_Disc_Title_Episodes.setItem(idx, 1, item)
-
-            item = QTableWidgetItem(episode.title)
-            self.tableWidget_Disc_Title_Episodes.setItem(idx, 2, item)
-
+            self.__NewEpisodeToTable(idx, episode)
             idx += 1
 
         # self.tableWidget_Disc_Title_Episodes.resizeColumnsToContents()
 
-        self.onDisc_Title_EnbableChapterRangeWidgets()
+        self.onDisc_Title_EnableChapterRangeWidgets()
 
     def __TitleDetailsFromWidgets(self):
         """ Update the title details from the title detail widgets.
 
             Only the editable items are updated.
         """
-        title = self.tableWidget_Disc_Title.item(0, 0).data(Qt.UserRole)
-
+        title = self.activeTitle(False)
         if (title is None):
             return
 
@@ -1016,7 +1156,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         for idx in range(self.tableWidget_Disc_Chapters.rowCount()):
             chapter = self.tableWidget_Disc_Chapters.item(idx, 0).data(Qt.UserRole)
-            chapter.title = self.tableWidget_Disc_Chapters.item(idx, 3).text()
+            chapter.title = self.tableWidget_Disc_Chapters.item(idx, 3).data(Qt.EditRole)
 
         # Update the chapter ranges widgets.
         # ======================================================================
@@ -1030,16 +1170,13 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         title.chapterRanges.firstChapter = self.spinBox_Disc_Title_ChapterRange_First.value()
         title.chapterRanges.lastChapter = self.spinBox_Disc_Title_ChapterRange_Last.value()
 
-        print(self.tableWidget_Disc_Title_Episodes.rowCount(), 'title', title.titleNumber)
         title.chapterRanges.clearEpisodes()
         for idx in range(self.tableWidget_Disc_Title_Episodes.rowCount()):
             title.chapterRanges.AddEpisode(
                 self.tableWidget_Disc_Title_Episodes.item(idx, 0).data(Qt.EditRole),
                 self.tableWidget_Disc_Title_Episodes.item(idx, 1).data(Qt.EditRole),
-                self.tableWidget_Disc_Title_Episodes.item(idx, 2).text()
+                self.tableWidget_Disc_Title_Episodes.item(idx, 2).data(Qt.EditRole)
             )
-
-            print (idx, title.chapterRanges.episodes[idx])
 
     def onEditPreferences(self):
         """Edit the application preferences."""
@@ -1157,8 +1294,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         if (not self.Validator_Disc_Source.isValid()):
             return
 
-        print (self.preferences.executables.VLC)
-
         # process = QProcess(QApplication.instance())
         started = QProcess.startDetached('"{}" "{}"'.format(self.preferences.executables.VLC, self.lineEdit_Disc_Source.text()))
 
@@ -1181,8 +1316,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
             parameters.append('-i')
             parameters.append(self.lineEdit_Disc_Source.text())
-
-            print (self.preferences.executables.handBrakeCLI, parameters)
 
             process = QProcess(QApplication.instance())
             process.start(self.preferences.executables.handBrakeCLI, parameters)
@@ -1291,30 +1424,17 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             widget.setLayout(layout)
             self.tableWidget_Disc_Titles.setCellWidget(idx, 0, widget)
 
-            item = QTableWidgetItem()
-            # item.setTextAlignment(Qt.AlignHCenter)
-            # item.setCheckState(Qt.Unchecked)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            item.setData(Qt.UserRole, title)
-            self.tableWidget_Disc_Titles.setItem(idx, 0, item)
-
-            item = QTableWidgetItem(str(title.titleNumber))
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            self.tableWidget_Disc_Titles.setItem(idx, 1, item)
-
-            item = QTableWidgetItem(str(title.duration))
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            self.tableWidget_Disc_Titles.setItem(idx, 2, item)
-
-            item = QTableWidgetItem(str(title.displayAspectRatio))
-            item.setTextAlignment(Qt.AlignRight | Qt.AlignBottom)
-            item.setFlags(item.flags() & ~Qt.ItemIsEditable)
-            self.tableWidget_Disc_Titles.setItem(idx, 3, item)
-
-            item = QTableWidgetItem(title.title)
-            self.tableWidget_Disc_Titles.setItem(idx, 4, item)
+            # Add an item behind the checkbox.  It's need to generate item change signals.
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Titles, idx, 0,
+                None, data=title, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Titles, idx, 1,
+                title.titleNumber, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Titles, idx, 2,
+                title.duration, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Titles, idx, 3,
+                title.displayAspectRatio, readOnly=True)
+            AddItemToTableWidgetCell(self.tableWidget_Disc_Titles, idx, 4,
+                title.title, textAlignment=None)
 
             self.tableWidget_Disc_Titles.setRowHidden(idx, not title.visible)
 
