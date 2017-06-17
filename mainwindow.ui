@@ -69,6 +69,9 @@
              <property name="text">
               <string>Source</string>
              </property>
+             <property name="buddy">
+              <cstring>lineEdit_Disc_Source</cstring>
+             </property>
             </widget>
            </item>
            <item row="0" column="1">
@@ -181,6 +184,9 @@
              <property name="text">
               <string>Disk</string>
              </property>
+             <property name="buddy">
+              <cstring>lineEdit_Disc_DiskLabel</cstring>
+             </property>
             </widget>
            </item>
            <item row="0" column="9">
@@ -239,6 +245,9 @@
             <widget class="QLabel" name="label_Disc_Destination">
              <property name="text">
               <string>Destination</string>
+             </property>
+             <property name="buddy">
+              <cstring>lineEdit_Disc_Destination</cstring>
              </property>
             </widget>
            </item>
@@ -614,6 +623,9 @@
               </property>
               <property name="text">
                <string>Preset</string>
+              </property>
+              <property name="buddy">
+               <cstring>comboBox_Disc_Preset</cstring>
               </property>
              </widget>
              <widget class="QComboBox" name="comboBox_Disc_Preset">
@@ -1531,9 +1543,9 @@
                <enum>QTabWidget::North</enum>
               </property>
               <property name="currentIndex">
-               <number>4</number>
+               <number>5</number>
               </property>
-              <widget class="QWidget" name="tab_Disc_Title">
+              <widget class="QWidget" name="tab_DiscTitle_Title">
                <attribute name="title">
                 <string>Title</string>
                </attribute>
@@ -1631,7 +1643,7 @@
                 </item>
                </layout>
               </widget>
-              <widget class="QWidget" name="tab_Disc_Chapters">
+              <widget class="QWidget" name="tab_DiscTitle_Chapters">
                <attribute name="title">
                 <string>Chapters</string>
                </attribute>
@@ -1881,7 +1893,7 @@
                 </item>
                </layout>
               </widget>
-              <widget class="QWidget" name="tab_Disc_ChapterRanges">
+              <widget class="QWidget" name="tab_DiscTitle_ChapterRanges">
                <attribute name="title">
                 <string>Chapter Ranges</string>
                </attribute>
@@ -2806,6 +2818,427 @@
                    <size>
                     <width>20</width>
                     <height>14</height>
+                   </size>
+                  </property>
+                 </spacer>
+                </item>
+               </layout>
+              </widget>
+              <widget class="QWidget" name="tab_DiscTitle_Croping">
+               <attribute name="title">
+                <string>Cropping</string>
+               </attribute>
+               <layout class="QVBoxLayout" name="verticalLayout_5">
+                <item>
+                 <widget class="QFrame" name="frame_10">
+                  <property name="frameShape">
+                   <enum>QFrame::NoFrame</enum>
+                  </property>
+                  <property name="frameShadow">
+                   <enum>QFrame::Raised</enum>
+                  </property>
+                  <layout class="QHBoxLayout" name="horizontalLayout_6">
+                   <property name="leftMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="topMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="rightMargin">
+                    <number>0</number>
+                   </property>
+                   <property name="bottomMargin">
+                    <number>0</number>
+                   </property>
+                   <item>
+                    <widget class="QRadioButton" name="radioButton_DiscTitle_Crop_Default">
+                     <property name="toolTip">
+                      <string>Use the disc (global) cropping.</string>
+                     </property>
+                     <property name="text">
+                      <string>Default</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QRadioButton" name="radioButton_DiscTitle_Crop_Automatic">
+                     <property name="toolTip">
+                      <string>Use the HandBrake automatic cropping for the selected title.</string>
+                     </property>
+                     <property name="text">
+                      <string>Automatic</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QRadioButton" name="radioButton_DiscTitle_Crop_Custom">
+                     <property name="toolTip">
+                      <string>Use custom cropping for the selected title.</string>
+                     </property>
+                     <property name="text">
+                      <string>Custom</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <spacer name="horizontalSpacer_11">
+                     <property name="orientation">
+                      <enum>Qt::Horizontal</enum>
+                     </property>
+                     <property name="sizeHint" stdset="0">
+                      <size>
+                       <width>40</width>
+                       <height>20</height>
+                      </size>
+                     </property>
+                    </spacer>
+                   </item>
+                   <item>
+                    <widget class="QToolButton" name="toolButton_DiscTitle_Crop_Clear">
+                     <property name="sizePolicy">
+                      <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                       <horstretch>0</horstretch>
+                       <verstretch>0</verstretch>
+                      </sizepolicy>
+                     </property>
+                     <property name="toolTip">
+                      <string>Clear the cropping settings for the selected title.</string>
+                     </property>
+                     <property name="text">
+                      <string>...</string>
+                     </property>
+                     <property name="icon">
+                      <iconset>
+                       <normaloff>images/redo_2_16.png</normaloff>images/redo_2_16.png</iconset>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <widget class="QToolButton" name="toolButton_DiscTitle_Crop_Find">
+                     <property name="toolTip">
+                      <string>Find and set custom cropping for the current title.</string>
+                     </property>
+                     <property name="text">
+                      <string>...</string>
+                     </property>
+                     <property name="icon">
+                      <iconset>
+                       <normaloff>images/find_16.png</normaloff>images/find_16.png</iconset>
+                     </property>
+                    </widget>
+                   </item>
+                  </layout>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QFrame" name="frame_11">
+                  <property name="minimumSize">
+                   <size>
+                    <width>241</width>
+                    <height>101</height>
+                   </size>
+                  </property>
+                  <property name="frameShape">
+                   <enum>QFrame::NoFrame</enum>
+                  </property>
+                  <property name="frameShadow">
+                   <enum>QFrame::Raised</enum>
+                  </property>
+                  <widget class="QSpinBox" name="spinBox_DiscTitle_Crop_Left">
+                   <property name="geometry">
+                    <rect>
+                     <x>33</x>
+                     <y>37</y>
+                     <width>60</width>
+                     <height>24</height>
+                    </rect>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>60</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>60</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <number>4096</number>
+                   </property>
+                  </widget>
+                  <widget class="QLabel" name="label_DiscTitle_Crop_Left">
+                   <property name="geometry">
+                    <rect>
+                     <x>4</x>
+                     <y>40</y>
+                     <width>23</width>
+                     <height>17</height>
+                    </rect>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>0</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>16777215</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>Left</string>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="buddy">
+                    <cstring>spinBox_DiscTitle_Crop_Left</cstring>
+                   </property>
+                  </widget>
+                  <widget class="QLabel" name="label_DiscTitle_Crop_Bottom">
+                   <property name="geometry">
+                    <rect>
+                     <x>50</x>
+                     <y>70</y>
+                     <width>43</width>
+                     <height>17</height>
+                    </rect>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>0</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>16777215</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>Bottom</string>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="buddy">
+                    <cstring>spinBox_DiscTitle_Crop_Bottom</cstring>
+                   </property>
+                  </widget>
+                  <widget class="QSpinBox" name="spinBox_DiscTitle_Crop_Right">
+                   <property name="geometry">
+                    <rect>
+                     <x>165</x>
+                     <y>37</y>
+                     <width>60</width>
+                     <height>24</height>
+                    </rect>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>60</width>
+                     <height>23</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>60</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <number>4096</number>
+                   </property>
+                  </widget>
+                  <widget class="QLabel" name="label_DiscTitle_Crop_Right">
+                   <property name="geometry">
+                    <rect>
+                     <x>128</x>
+                     <y>40</y>
+                     <width>31</width>
+                     <height>17</height>
+                    </rect>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>0</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>16777215</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>Right</string>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="buddy">
+                    <cstring>spinBox_DiscTitle_Crop_Right</cstring>
+                   </property>
+                  </widget>
+                  <widget class="QSpinBox" name="spinBox_DiscTitle_Crop_Bottom">
+                   <property name="geometry">
+                    <rect>
+                     <x>99</x>
+                     <y>67</y>
+                     <width>60</width>
+                     <height>24</height>
+                    </rect>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>60</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>60</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <number>4096</number>
+                   </property>
+                  </widget>
+                  <widget class="QLabel" name="label_DiscTitle_Crop_Top">
+                   <property name="geometry">
+                    <rect>
+                     <x>58</x>
+                     <y>10</y>
+                     <width>35</width>
+                     <height>17</height>
+                    </rect>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>35</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>35</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="text">
+                    <string>Top</string>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="buddy">
+                    <cstring>spinBox_DiscTitle_Crop_Top</cstring>
+                   </property>
+                  </widget>
+                  <widget class="QSpinBox" name="spinBox_DiscTitle_Crop_Top">
+                   <property name="geometry">
+                    <rect>
+                     <x>99</x>
+                     <y>6</y>
+                     <width>60</width>
+                     <height>25</height>
+                    </rect>
+                   </property>
+                   <property name="sizePolicy">
+                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                     <horstretch>0</horstretch>
+                     <verstretch>0</verstretch>
+                    </sizepolicy>
+                   </property>
+                   <property name="minimumSize">
+                    <size>
+                     <width>60</width>
+                     <height>0</height>
+                    </size>
+                   </property>
+                   <property name="maximumSize">
+                    <size>
+                     <width>60</width>
+                     <height>16777215</height>
+                    </size>
+                   </property>
+                   <property name="alignment">
+                    <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+                   </property>
+                   <property name="maximum">
+                    <number>4096</number>
+                   </property>
+                  </widget>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="verticalSpacer_4">
+                  <property name="orientation">
+                   <enum>Qt::Vertical</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>20</width>
+                    <height>62</height>
                    </size>
                   </property>
                  </spacer>

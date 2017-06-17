@@ -66,6 +66,11 @@ from PyQt5SpinBoxDelegate import SpinBoxDelegate
 
 from AppInit import __TESTING_DO_NOT_SAVE_SESSION__
 from AudioTrackStates import AudioTrackState
+from AudioTrackWidgets import (
+    AudioTrackWidgets,
+    AudioTrackWidgetsList
+)
+from CropWidgets import CropWidgets
 from Disc import (
     Disc,
     DiscFilenameTemplatesSingleton,
@@ -73,6 +78,10 @@ from Disc import (
 )
 from SingletonLog import SingletonLog
 from SubtitleTrackStates import SubtitleTrackState
+from SubtitleTrackWidgets import (
+    SubtitleTrackWidgets,
+    SubtitleTrackWidgetsList
+)
 from Titles import (
     Titles,
     TitleVisibleSingleton
@@ -94,10 +103,20 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         super(MyMainWindow, self).__init__(parent)
         self.setupUi(self)
 
-        self.highlightedTabIcon = QIcon('images/draw_ellipse_16.png')
-        # self.highlightedTabIcon = QIcon('images/diamond_16.png')
+        # self.highlightedTabIcon = QIcon('images/draw_ellipse_16.png')
+        self.highlightedTabIcon = QIcon('images/diamond_16.png')
 
         self.__widgetDataConnectors = WidgetDataConnectors()
+        self.__disc_audioTrackWidgets = AudioTrackWidgetsList(self)
+        self.__disc_subtitleTrackWidgets = SubtitleTrackWidgetsList(self)
+        self.__disc_cropWidgets = CropWidgets(self,
+            self.spinBox_Disc_Crop_Top, self.spinBox_Disc_Crop_Bottom,
+            self.spinBox_Disc_Crop_Left, self.spinBox_Disc_Crop_Right)
+        self.__discTitle_audioTrackWidgets = AudioTrackWidgetsList(self)
+        self.__discTitle_subtitleTrackWidgets = SubtitleTrackWidgetsList(self)
+        self.__discTitle_cropWidgets = CropWidgets(self,
+            self.spinBox_DiscTitle_Crop_Top, self.spinBox_DiscTitle_Crop_Bottom,
+            self.spinBox_DiscTitle_Crop_Left, self.spinBox_DiscTitle_Crop_Right)
 
         self.actionBrowse_for_Video.triggered.connect(self.onAction_Disc_Source_Browse)
         self.actionBrowse_for_Destination.triggered.connect(self.onAction_Disc_Destination_Browse)
@@ -114,12 +133,17 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.__initDiscCropping()
         self.__initDiscTitleDetailWidgets()
 
+        self.__disc_audioTrackWidgets.addTrackItems(AudioTrackState.AUDIO_TRACK_CHOICES)
+        self.__disc_subtitleTrackWidgets.addTrackItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
+        self.__discTitle_audioTrackWidgets.addTrackItems(AudioTrackState.AUDIO_TRACK_CHOICES)
+        self.__discTitle_subtitleTrackWidgets.addTrackItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
+
         self.Load_Disc_FilenameTemplates()
         self.Load_Disc_Presets()
-        self.Load_Disc_MixdownTrackNumbers()
+        # self.Load_Disc_MixdownTrackNumbers()
         self.Load_Disc_Mixdowns()
-        self.Load_Disc_SubtitleTrackNumbers()
-        self.Load_DiscTitle_MixdownTrackNumbers()
+        # self.Load_Disc_SubtitleTrackNumbers()
+        # self.Load_DiscTitle_MixdownTrackNumbers()
         self.Load_DiscTitle_Mixdowns()
 
     def __initDiscAudioTracks(self):
@@ -175,6 +199,27 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             self.disc.audioTrackStates[2], 'secondaryMixdown',
             self.WIDGET_GROUP_DISC_AUTO_AUDIO))
 
+        # Add the widgets to the list of widget rows.
+        # ======================================================================
+        self.__disc_audioTrackWidgets.append(AudioTrackWidgets(
+            self.__disc_audioTrackWidgets, 0,
+            self.comboBox_Disc_AudioTracks_SelectTrack_First,
+            self.comboBox_Disc_AudioTracks_Mixdown_First_Primary,
+            self.comboBox_Disc_AudioTracks_Mixdown_First_Secondary
+        ))
+        self.__disc_audioTrackWidgets.append(AudioTrackWidgets(
+            self.__disc_audioTrackWidgets, 1,
+            self.comboBox_Disc_AudioTracks_SelectTrack_Second,
+            self.comboBox_Disc_AudioTracks_Mixdown_Second_Primary,
+            self.comboBox_Disc_AudioTracks_Mixdown_Second_Secondary
+        ))
+        self.__disc_audioTrackWidgets.append(AudioTrackWidgets(
+            self.__disc_audioTrackWidgets, 2,
+            self.comboBox_Disc_AudioTracks_SelectTrack_Third,
+            self.comboBox_Disc_AudioTracks_Mixdown_Third_Primary,
+            self.comboBox_Disc_AudioTracks_Mixdown_Third_Secondary
+        ))
+
         # Create the validators.
         # ======================================================================
 
@@ -215,6 +260,16 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             self.spinBox_Disc_Crop_Right, self.disc.customCrop, 'right',
             self.WIDGET_GROUP_DISC_CROP))
 
+        # Add the widgets to the list of widget rows.
+        # ======================================================================
+        self.__disc_subtitleTrackWidgets.append(SubtitleTrackWidgets(
+            self.__disc_subtitleTrackWidgets, 0,
+            self.comboBox_Disc_SubtitleTracks_SelectTrack_First,
+            self.checkBox_Disc_SubtitleTracks_Forced_First,
+            self.checkBox_Disc_SubtitleTracks_Burn_First,
+            self.checkBox_Disc_SubtitleTracks_Default_First
+        ))
+
         # Create the validators.
         # ======================================================================
 
@@ -241,7 +296,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # I'm sure there was a reason for this at some point, but I really can't remember why the hash would ever need to be re-calculated.
         # Oddly, the ui designer does not allow you to set the visible attribute.
         self.toolButton_Disc_UpdateHash.setVisible(False)
-        self.toolButton_Disc_RunVLC.clicked.connect(self.onVLC)
+        self.toolButton_Disc_RunVLC.clicked.connect(self.onButton_VLC)
 
         # Volume labels are only available under Windows.
         self.toolButton_Disc_GetSourceDiskLabel.setVisible(sys.platform == 'win32')
@@ -378,8 +433,32 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             self.WIDGET_GROUP_DISC_AUTO_SUBTITLE))
 
 
+
         # TODO Only one default, only one burned, a subtitle can't be both burned and default
 
+        # Add the widgets to the list of widget rows.
+        # ======================================================================
+        self.__disc_subtitleTrackWidgets.append(SubtitleTrackWidgets(
+            self.__disc_subtitleTrackWidgets, 0,
+            self.comboBox_Disc_SubtitleTracks_SelectTrack_First,
+            self.checkBox_Disc_SubtitleTracks_Forced_First,
+            self.checkBox_Disc_SubtitleTracks_Burn_First,
+            self.checkBox_Disc_SubtitleTracks_Default_First
+        ))
+        self.__disc_subtitleTrackWidgets.append(SubtitleTrackWidgets(
+            self.__disc_subtitleTrackWidgets, 1,
+            self.comboBox_Disc_SubtitleTracks_SelectTrack_Second,
+            self.checkBox_Disc_SubtitleTracks_Forced_Second,
+            self.checkBox_Disc_SubtitleTracks_Burn_Second,
+            self.checkBox_Disc_SubtitleTracks_Default_Second
+        ))
+        self.__disc_subtitleTrackWidgets.append(SubtitleTrackWidgets(
+            self.__disc_subtitleTrackWidgets, 2,
+            self.comboBox_Disc_SubtitleTracks_SelectTrack_Third,
+            self.checkBox_Disc_SubtitleTracks_Forced_Third,
+            self.checkBox_Disc_SubtitleTracks_Burn_Third,
+            self.checkBox_Disc_SubtitleTracks_Default_Third
+        ))
 
         # Create the validators.
         # ======================================================================
@@ -388,7 +467,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # TODO make sure at least on mixdown is selected
 
     def __initDiscTitleDetailWidgets(self):
-        """ Initialze the tables used to display the detail information for a
+        """ Initialze the widgets used to display the detail information for a
             title.
         """
         # The table displaying the list of disc titles.
@@ -471,8 +550,80 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.radioButton_DiscTitle_AudioTracks_Default.clicked.connect(self.onDiscTitle_EnableAudioTracksWidgets)
         self.radioButton_DiscTitle_AudioTracks_Custom.clicked.connect(self.onDiscTitle_EnableAudioTracksWidgets)
 
+        self.__discTitle_audioTrackWidgets.append(AudioTrackWidgets(
+            self.__discTitle_audioTrackWidgets, 0,
+            self.comboBox_DiscTitle_AudioTracks_SelectTrack_First,
+            self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Primary,
+            self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Secondary
+        ))
+        self.__discTitle_audioTrackWidgets.append(AudioTrackWidgets(
+            self.__discTitle_audioTrackWidgets, 1,
+            self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second,
+            self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Primary,
+            self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Secondary
+        ))
+        self.__discTitle_audioTrackWidgets.append(AudioTrackWidgets(
+            self.__discTitle_audioTrackWidgets, 2,
+            self.comboBox_DiscTitle_AudioTracks_SelectTrack_Third,
+            self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Primary,
+            self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Secondary
+        ))
+
         self.radioButton_DiscTitle_AudioTracks_Default.setChecked(True)      # Set this to enable/disable chapter controls
         self.onDiscTitle_EnableAudioTracksWidgets()
+
+        # The widgets on the Title Subtitle Tracks tab.
+        # ======================================================================
+        self.toolButton_DiscTitle_SubtitleTracks_Clear.clicked.connect(self.onButton_DiscTitle_SubtitleTracks_Clear)
+        self.toolButton_DiscTitle_SubtitleTracks_Find.clicked.connect(self.onButton_DiscTitle_SubtitleTracks_Find)
+
+        self.radioButton_DiscTitle_SubtitleTracks_Default.clicked.connect(self.onDiscTitle_EnableSubtitleTracksWidgets)
+        self.radioButton_DiscTitle_SubtitleTracks_Custom.clicked.connect(self.onDiscTitle_EnableSubtitleTracksWidgets)
+
+        self.__discTitle_subtitleTrackWidgets.append(SubtitleTrackWidgets(
+            self.__discTitle_subtitleTrackWidgets, 0,
+            self.comboBox_DiscTitle_SubtitleTracks_SelectTrack_First,
+            self.checkBox_DiscTitle_SubtitleTracks_Forced_First,
+            self.checkBox_DiscTitle_SubtitleTracks_Burn_First,
+            self.checkBox_DiscTitle_SubtitleTracks_Default_First
+        ))
+        self.__discTitle_subtitleTrackWidgets.append(SubtitleTrackWidgets(
+            self.__discTitle_subtitleTrackWidgets, 1,
+            self.comboBox_DiscTitle_SubtitleTracks_SelectTrack_Second,
+            self.checkBox_DiscTitle_SubtitleTracks_Forced_Second,
+            self.checkBox_DiscTitle_SubtitleTracks_Burn_Second,
+            self.checkBox_DiscTitle_SubtitleTracks_Default_Second
+        ))
+        self.__discTitle_subtitleTrackWidgets.append(SubtitleTrackWidgets(
+            self.__discTitle_subtitleTrackWidgets, 2,
+            self.comboBox_DiscTitle_SubtitleTracks_SelectTrack_Third,
+            self.checkBox_DiscTitle_SubtitleTracks_Forced_Third,
+            self.checkBox_DiscTitle_SubtitleTracks_Burn_Third,
+            self.checkBox_DiscTitle_SubtitleTracks_Default_Third
+        ))
+
+        self.radioButton_DiscTitle_SubtitleTracks_Default.setChecked(True)      # Set this to enable/disable chapter controls
+        self.onDiscTitle_EnableSubtitleTracksWidgets()
+
+        # The widgets on the Title Cropping tab.
+        # ======================================================================
+        self.toolButton_DiscTitle_Crop_Clear.clicked.connect(self.onButton_DiscTitle_Crop_Clear)
+        self.toolButton_DiscTitle_Crop_Find.clicked.connect(self.onButton_DiscTitle_Crop_Find)
+
+        self.radioButton_DiscTitle_Crop_Default.clicked.connect(self.onDiscTitle_EnableCropWidgets)
+        self.radioButton_DiscTitle_Crop_Automatic.clicked.connect(self.onDiscTitle_EnableCropWidgets)
+        self.radioButton_DiscTitle_Crop_Custom.clicked.connect(self.onDiscTitle_EnableCropWidgets)
+
+        # self.__discTitle_cropWidgets.append(SubtitleTrackWidgets(
+        #     self.__discTitle_subtitleTrackWidgets, 0,
+        #     self.comboBox_DiscTitle_SubtitleTracks_SelectTrack_First,
+        #     self.checkBox_DiscTitle_SubtitleTracks_Forced_First,
+        #     self.checkBox_DiscTitle_SubtitleTracks_Burn_First,
+        #     self.checkBox_DiscTitle_SubtitleTracks_Default_First
+        # ))
+
+        self.radioButton_DiscTitle_Crop_Default.setChecked(True)      # Set this to enable/disable chapter controls
+        self.onDiscTitle_EnableCropWidgets()
 
     @property
     def disc(self):
@@ -527,8 +678,10 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """ Load the titles mixdown track ComboBoxes from the preferences.
         """
 
-        # TODO use real track number from the Disc?  Must use highest available track number, can't change this per title because it applies to all titles.
-        #       Probably not worth the effort.  If not, move this to __initDiscAudioTracks.
+        # TODO use real track number from the Disc?  Must use highest available track number,
+        #   can't change this per title because it applies to all titles.
+        #   Probably not worth the effort.  If not, move this to __initDiscAudioTracks.
+        #   Should these be spinboxes instead?
 
         self.comboBox_Disc_AudioTracks_SelectTrack_First.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
         self.comboBox_Disc_AudioTracks_SelectTrack_Second.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
@@ -543,37 +696,28 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         mixdowns = ['']
         for mixdown in self.preferences.mixdowns:
             mixdowns.append(mixdown.name)
-
-        self.comboBox_Disc_AudioTracks_Mixdown_First_Primary.addItems(mixdowns)
-        self.comboBox_Disc_AudioTracks_Mixdown_Second_Primary.addItems(mixdowns)
-        self.comboBox_Disc_AudioTracks_Mixdown_Third_Primary.addItems(mixdowns)
-
-        self.comboBox_Disc_AudioTracks_Mixdown_First_Secondary.addItems(mixdowns)
-        self.comboBox_Disc_AudioTracks_Mixdown_Second_Secondary.addItems(mixdowns)
-        self.comboBox_Disc_AudioTracks_Mixdown_Third_Secondary.addItems(mixdowns)
-
-        # self.comboBox_Disc_AudioTracks_Mixdown_Third_Secondary.update()
+        self.__disc_audioTrackWidgets.addMixdownItems(mixdowns)
 
         self.groupBox_Disc_AudioTracks.updateGeometry()
 
-    def Load_Disc_SubtitleTrackNumbers(self):
-        """ Load the titles mixdown track ComboBoxes from the preferences.
-        """
+    # def Load_Disc_SubtitleTrackNumbers(self):
+    #     """ Load the titles mixdown track ComboBoxes from the preferences.
+    #     """
+    #
+    #     self.comboBox_Disc_SubtitleTracks_SelectTrack_First.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
+    #     self.comboBox_Disc_SubtitleTracks_SelectTrack_Second.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
+    #     self.comboBox_Disc_SubtitleTracks_SelectTrack_Third.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
 
-        self.comboBox_Disc_SubtitleTracks_SelectTrack_First.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
-        self.comboBox_Disc_SubtitleTracks_SelectTrack_Second.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
-        self.comboBox_Disc_SubtitleTracks_SelectTrack_Third.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
-
-    def Load_DiscTitle_MixdownTrackNumbers(self):
-        """ Load the titles mixdown track ComboBoxes from the preferences.
-        """
-
-        # TODO use real track number from the Disc?  Must use highest available track number, can't change this per title because it applies to all titles.
-        #       Probably not worth the effort.  If not, move this to __initDiscAudioTracks.
-
-        self.comboBox_DiscTitle_AudioTracks_SelectTrack_First.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-        self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-        self.comboBox_DiscTitle_AudioTracks_SelectTrack_Third.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
+    # def Load_DiscTitle_MixdownTrackNumbers(self):
+    #     """ Load the titles mixdown track ComboBoxes from the preferences.
+    #     """
+    #
+    #     # TODO use real track number from the Disc?  Must use highest available track number, can't change this per title because it applies to all titles.
+    #     #       Probably not worth the effort.  If not, move this to __initDiscAudioTracks.
+    #
+    #     self.comboBox_DiscTitle_AudioTracks_SelectTrack_First.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
+    #     self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
+    #     self.comboBox_DiscTitle_AudioTracks_SelectTrack_Third.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
 
     def Load_DiscTitle_Mixdowns(self):
         """ Load the titles mixdown ComboBoxes from the preferences.
@@ -585,22 +729,14 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         for mixdown in self.preferences.mixdowns:
             mixdowns.append(mixdown.name)
 
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Primary.addItems(mixdowns)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Primary.addItems(mixdowns)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Primary.addItems(mixdowns)
-
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Secondary.addItems(mixdowns)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Secondary.addItems(mixdowns)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Secondary.addItems(mixdowns)
-
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Secondary.update()
+        self.__discTitle_audioTrackWidgets.addMixdownItems(mixdowns)
 
         self.frame_DiscTitle_AudioTracks.updateGeometry()
 
     def __NewEpisodeToTable(self, idx, episode):
         """ Insert a new episode in the tableWidget_DiscTitle_Episodes table.
 
-            The talbe row (idx) must already exist.
+            The table row (idx) must already exist.
         """
         AddItemToTableWidgetCell(self.tableWidget_DiscTitle_Episodes, idx, 0,
             episode.firstChapter, data=episode)
@@ -706,29 +842,12 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         title.audioTrackStates.clear()
         self.__DiscTitle_AudioTrackStatesToWidgets(title)
 
-        # self.radioButton_DiscTitle_AudioTracks_Default.setChecked(True)
-        #
-        # audioTrackState = title.audioTrackStates[0]
-        # self.comboBox_DiscTitle_AudioTracks_SelectTrack_First.setCurrentText(audioTrackState.track)
-        # self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second.setCurrentText(audioTrackState.primaryMixdown)
-        # self.comboBox_DiscTitle_AudioTracks_SelectTrack_Third.setCurrentText(audioTrackState.secondaryMixdown)
-        #
-        # audioTrackState = title.audioTrackStates[1]
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Primary.setCurrentText(audioTrackState.track)
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Primary.setCurrentText(audioTrackState.primaryMixdown)
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Primary.setCurrentText(audioTrackState.secondaryMixdown)
-        #
-        # audioTrackState = title.audioTrackStates[2]
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Secondary.setCurrentText(audioTrackState.track)
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Secondary.setCurrentText(audioTrackState.primaryMixdown)
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Secondary.setCurrentText(audioTrackState.secondaryMixdown)
-
         self.onDiscTitle_EnableAudioTracksWidgets()
 
         self.statusBar.showMessage('Title audio track states cleared.', 15000)
 
     def onButton_DiscTitle_AudioTracks_Find(self):
-        """ Clear the current audio track settings for the active title.
+        """ Find the current audio track settings for the active title.
         """
         title = self.activeTitle()
         if (title is None):
@@ -752,20 +871,19 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.radioButton_DiscTitle_AudioTracks_Custom.setChecked(True)
 
-        audioTrackState = title.audioTrackStates[0]
-        self.comboBox_DiscTitle_AudioTracks_SelectTrack_First.setCurrentText(audioTrackState.track)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Primary.setCurrentText(audioTrackState.primaryMixdown)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Secondary.setCurrentText(audioTrackState.secondaryMixdown)
+        self.__discTitle_audioTrackWidgets.setWidgetsFromTrackStates(title.audioTrackStates)
 
-        audioTrackState = title.audioTrackStates[1]
-        self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second.setCurrentText(audioTrackState.track)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Primary.setCurrentText(audioTrackState.primaryMixdown)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Secondary.setCurrentText(audioTrackState.secondaryMixdown)
+    def onButton_DiscTitle_ChapterRange_Reset(self):
+        """ Reset the chapter ranges for the selected title.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
 
-        audioTrackState = title.audioTrackStates[2]
-        self.comboBox_DiscTitle_AudioTracks_SelectTrack_Third.setCurrentText(audioTrackState.track)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Primary.setCurrentText(audioTrackState.primaryMixdown)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Secondary.setCurrentText(audioTrackState.secondaryMixdown)
+        self.spinBox_DiscTitle_ChapterRange_First.setValue(title.chapters.lowestChapterNumber)
+        self.spinBox_DiscTitle_ChapterRange_Last.setValue(title.chapters.highestChapterNumber)
+
+        self.statusBar.showMessage('Chapter ranges reset.', 15000)
 
     def onButton_DiscTitle_CopyEpisode(self):
         """ Copy a chapter episode.
@@ -792,17 +910,32 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.statusBar.showMessage('1 episode copied.', 15000)
 
-    def onButton_DiscTitle_ChapterRange_Reset(self):
-        """ Reset the chapter ranges for the selected title.
+    def onButton_DiscTitle_Crop_Clear(self):
+        """ Clear the current crop settings for the active title.
         """
         title = self.activeTitle()
         if (title is None):
             return
 
-        self.spinBox_DiscTitle_ChapterRange_First.setValue(title.chapters.lowestChapterNumber)
-        self.spinBox_DiscTitle_ChapterRange_Last.setValue(title.chapters.highestChapterNumber)
+        title.customCrop.clear()
+        self.__DiscTitle_CropStatesToWidgets(title)
+        self.onDiscTitle_EnableCropWidgets()
 
-        self.statusBar.showMessage('Chapter ranges reset.', 15000)
+        self.statusBar.showMessage('Title cropping states cleared.', 15000)
+
+    def onButton_DiscTitle_Crop_Find(self):
+        """ Clear the current audio track settings for the active title.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        title.customCrop.Copy(title.autoCrop)
+        title.customCrop.processChoice = title.customCrop.PROCESS_CUSTOM
+        self.__DiscTitle_CropStatesToWidgets(title)
+        self.onDiscTitle_EnableCropWidgets()
+
+        self.statusBar.showMessage('Title cropping states found and set.', 15000)
 
     def onButton_DiscTitle_DeleteEpisode(self):
         """ Delete an episode from a titles.
@@ -846,6 +979,59 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.statusBar.showMessage('{} episodes deleted.'.format(rowCount), 15000)
 
+    def onButton_DiscTitle_SubtitleTracks_Clear(self):
+        """ Clear the current subtitle track settings for the active title.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        title.subtitleTrackStates.clear()
+        self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
+        self.onDiscTitle_EnableSubtitleTracksWidgets()
+
+        self.statusBar.showMessage('Title subtitle track states cleared.', 15000)
+
+    def onButton_DiscTitle_SubtitleTracks_Find(self):
+        """ Clear the current subtitle track settings for the active title.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        title.subtitleTrackStates.AutoSet_From_SubtitleTracks(title.subtitleTracks,
+            self.preferences)
+        title.subtitleTrackStates.processChoice = title.subtitleTrackStates.PROCESS_CUSTOM
+
+        self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
+        self.onDiscTitle_EnableSubtitleTracksWidgets()
+
+        self.statusBar.showMessage('Title subtitle track states found and set.', 15000)
+
+    def __DiscTitle_SubtitleTrackStatesToWidgets(self, title):
+        """ Transfer the title data to the title subtitle track state widgets on
+            the Subtitle Tracks tab.
+        """
+        if (title.subtitleTrackStates.processChoice == title.subtitleTrackStates.PROCESS_DEFAULT):
+            self.radioButton_DiscTitle_SubtitleTracks_Default.setChecked(True)
+        else:
+            self.radioButton_DiscTitle_SubtitleTracks_Custom.setChecked(True)
+
+        self.__discTitle_subtitleTrackWidgets.setWidgetsFromTrackStates(title.subtitleTrackStates)
+
+    def __DiscTitle_CropStatesToWidgets(self, title):
+        """ Transfer the title data to the title crop state widgets on the
+            Cropping tab.
+        """
+        if (title.customCrop.processChoice == title.customCrop.PROCESS_DEFAULT):
+            self.radioButton_DiscTitle_Crop_Default.setChecked(True)
+        elif (title.customCrop.processChoice == title.customCrop.PROCESS_AUTOMATIC):
+            self.radioButton_DiscTitle_Crop_Automatic.setChecked(True)
+        else:
+            self.radioButton_DiscTitle_Crop_Custom.setChecked(True)       # PROCESS_ALL
+
+        self.__discTitle_cropWidgets.setWidgetsFromCrop(title.customCrop)
+
     def onDiscTitle_EnableAudioTracksWidgets(self, bool=False):
         """ Enable/disable the widgets associated with custom audio track mixdowns.
         """
@@ -865,17 +1051,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.toolButton_DiscTitle_AudioTracks_Clear.setEnabled(enableButtons)
         self.toolButton_DiscTitle_AudioTracks_Find.setEnabled(enableButtons)
 
-        self.comboBox_DiscTitle_AudioTracks_SelectTrack_First.setEnabled(enableBoxes)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Primary.setEnabled(enableBoxes)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Secondary.setEnabled(enableBoxes)
-
-        self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second.setEnabled(enableBoxes)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Primary.setEnabled(enableBoxes)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Secondary.setEnabled(enableBoxes)
-
-        self.comboBox_DiscTitle_AudioTracks_SelectTrack_Third.setEnabled(enableBoxes)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Primary.setEnabled(enableBoxes)
-        self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Secondary.setEnabled(enableBoxes)
+        self.__discTitle_audioTrackWidgets.setEnabled(enableBoxes)
 
         if (self.radioButton_DiscTitle_AudioTracks_Default.isChecked()):
             self.tabWidget_Disc.setTabIcon(3, QIcon())
@@ -891,10 +1067,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.radioButton_DiscTitle_AllChapters.setEnabled(rowCount)
         self.radioButton_DiscTitle_ChapterRange.setEnabled(rowCount)
         self.radioButton_DiscTitle_Episodes.setEnabled(rowCount)
-
-        # self.spinBox_DiscTitle_ChapterRange_First.setEnabled(rowCount)
-        # self.spinBox_DiscTitle_ChapterRange_First.setEnabled(rowCount)
-        # self.toolButton_Disc_Chapters_ResetFirstChapter.setEnabled(rowCount)
 
         self.spinBox_DiscTitle_ChapterRange_First.setEnabled(self.radioButton_DiscTitle_ChapterRange.isChecked())
         self.spinBox_DiscTitle_ChapterRange_Last.setEnabled(self.radioButton_DiscTitle_ChapterRange.isChecked())
@@ -941,6 +1113,58 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             self.tabWidget_Disc.setTabIcon(1, QIcon())
         else:
             self.tabWidget_Disc.setTabIcon(1, self.highlightedTabIcon)
+
+    def onDiscTitle_EnableCropWidgets(self, bool=False):
+        """ Enable/disable the widgets associated with custom cropping.
+        """
+        title = self.activeTitle(False)
+        enableButtons = False
+        enableBoxes = False
+
+        if (title is not None):
+            enableButtons = True
+
+        if (enableButtons and self.radioButton_DiscTitle_Crop_Custom.isChecked()):
+            enableBoxes = True
+
+        self.radioButton_DiscTitle_Crop_Default.setEnabled(enableButtons)
+        self.radioButton_DiscTitle_Crop_Automatic.setEnabled(enableButtons)
+        self.radioButton_DiscTitle_Crop_Custom.setEnabled(enableButtons)
+        self.toolButton_DiscTitle_Crop_Clear.setEnabled(enableButtons)
+        self.toolButton_DiscTitle_Crop_Find.setEnabled(enableButtons)
+
+        self.__discTitle_cropWidgets.setEnabled(enableBoxes)
+
+        if (self.radioButton_DiscTitle_Crop_Default.isChecked()):
+            self.tabWidget_Disc.setTabIcon(5, QIcon())
+        else:
+            self.tabWidget_Disc.setTabIcon(5, self.highlightedTabIcon)
+
+    def onDiscTitle_EnableSubtitleTracksWidgets(self, bool=False):
+        """ Enable/disable the widgets associated with custom subtitle track mixdowns.
+        """
+        title = self.activeTitle(False)
+        enableButtons = False
+        enableBoxes = False
+
+        if (title is not None):
+            if (len(title.subtitleTracks)):
+                enableButtons = True
+
+        if (enableButtons and self.radioButton_DiscTitle_SubtitleTracks_Custom.isChecked()):
+            enableBoxes = True
+
+        self.radioButton_DiscTitle_SubtitleTracks_Default.setEnabled(enableButtons)
+        self.radioButton_DiscTitle_SubtitleTracks_Custom.setEnabled(enableButtons)
+        self.toolButton_DiscTitle_SubtitleTracks_Clear.setEnabled(enableButtons)
+        self.toolButton_DiscTitle_SubtitleTracks_Find.setEnabled(enableButtons)
+
+        self.__discTitle_subtitleTrackWidgets.setEnabled(enableBoxes)
+
+        if (self.radioButton_DiscTitle_SubtitleTracks_Default.isChecked()):
+            self.tabWidget_Disc.setTabIcon(4, QIcon())
+        else:
+            self.tabWidget_Disc.setTabIcon(4, self.highlightedTabIcon)
 
     # TODO add status bar messages for lots of actions
 
@@ -1288,28 +1512,35 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         # Update the title audio state widgets.
         # ======================================================================
-        self.__DiscTitle_AudioTrackStatesToWidgets(title)
         # if (title.audioTrackStates.processChoice == title.audioTrackStates.PROCESS_DEFAULT):
         #     self.radioButton_DiscTitle_AudioTracks_Default.setChecked(True)
         # else:
         #     self.radioButton_DiscTitle_AudioTracks_Custom.setChecked(True)       # PROCESS_ALL
-        #
-        # audioTrackState = title.audioTrackStates[0]
-        # self.comboBox_DiscTitle_AudioTracks_SelectTrack_First.setCurrentText(audioTrackState.track)
-        # self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second.setCurrentText(audioTrackState.primaryMixdown)
-        # self.comboBox_DiscTitle_AudioTracks_SelectTrack_Third.setCurrentText(audioTrackState.secondaryMixdown)
-        #
-        # audioTrackState = title.audioTrackStates[1]
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Primary.setCurrentText(audioTrackState.track)
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Primary.setCurrentText(audioTrackState.primaryMixdown)
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Primary.setCurrentText(audioTrackState.secondaryMixdown)
-        #
-        # audioTrackState = title.audioTrackStates[2]
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Secondary.setCurrentText(audioTrackState.track)
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Secondary.setCurrentText(audioTrackState.primaryMixdown)
-        # self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Secondary.setCurrentText(audioTrackState.secondaryMixdown)
 
+        self.__DiscTitle_AudioTrackStatesToWidgets(title)
         self.onDiscTitle_EnableAudioTracksWidgets()
+
+        # Update the title subtitle state widgets.
+        # ======================================================================
+        # if (title.subtitleTrackStates.processChoice == title.subtitleTrackStates.PROCESS_DEFAULT):
+        #     self.radioButton_DiscTitle_SubtitleTracks_Default.setChecked(True)
+        # else:
+        #     self.radioButton_DiscTitle_SubtitleTracks_Custom.setChecked(True)       # PROCESS_ALL
+
+        self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
+        self.onDiscTitle_EnableSubtitleTracksWidgets()
+
+        # Update the title crop state widgets.
+        # ======================================================================
+        # if (title.customCrop.processChoice == title.customCrop.PROCESS_DEFAULT):
+        #     self.radioButton_DiscTitle_Crop_Default.setChecked(True)
+        # elif (title.customCrop.processChoice == title.customCrop.PROCESS_AUTOMATIC):
+        #     self.radioButton_DiscTitle_Crop_Automatic.setChecked(True)
+        # else:
+        #     self.radioButton_DiscTitle_Crop_Custom.setChecked(True)       # PROCESS_ALL
+
+        self.__DiscTitle_CropStatesToWidgets(title)
+        self.onDiscTitle_EnableCropWidgets()
 
     def __TitleDetailsFromWidgets(self):
         """ Update the title details from the title detail widgets.
@@ -1362,20 +1593,30 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         else:
             title.audioTrackStates.processChoice = title.audioTrackStates.PROCESS_CUSTOM
 
-        audioTrackState = title.audioTrackStates[0]
-        audioTrackState.track = self.comboBox_DiscTitle_AudioTracks_SelectTrack_First.currentText()
-        audioTrackState.primaryMixdown = self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Primary.currentText()
-        audioTrackState.secondaryMixdown = self.comboBox_DiscTitle_AudioTracks_Mixdown_First_Secondary.currentText()
+        self.__discTitle_audioTrackWidgets.setTrackStatesFromWidgets(title.audioTrackStates)
 
-        audioTrackState = title.audioTrackStates[1]
-        audioTrackState.track = self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second.currentText()
-        audioTrackState.primaryMixdown = self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Primary.currentText()
-        audioTrackState.secondaryMixdown = self.comboBox_DiscTitle_AudioTracks_Mixdown_Second_Secondary.currentText()
+        # Update the title subtitle states.
+        # ======================================================================
+        if (self.radioButton_DiscTitle_SubtitleTracks_Default.isChecked()):
+            title.subtitleTrackStates.processChoice = title.subtitleTrackStates.PROCESS_DEFAULT
+        else:
+            title.subtitleTrackStates.processChoice = title.subtitleTrackStates.PROCESS_CUSTOM
 
-        audioTrackState = title.audioTrackStates[2]
-        audioTrackState.track = self.comboBox_DiscTitle_AudioTracks_SelectTrack_Third.currentText()
-        audioTrackState.primaryMixdown = self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Primary.currentText()
-        audioTrackState.secondaryMixdown = self.comboBox_DiscTitle_AudioTracks_Mixdown_Third_Secondary.currentText()
+        self.__discTitle_subtitleTrackWidgets.setTrackStatesFromWidgets(title.subtitleTrackStates)
+
+        # Update the title crop states.
+        # ======================================================================
+
+        # TODO refactor to use data connectors
+
+        if self.radioButton_DiscTitle_Crop_Default.isChecked():
+            title.customCrop.processChoice = title.customCrop.PROCESS_DEFAULT
+        elif self.radioButton_DiscTitle_Crop_Automatic.isChecked():
+            title.customCrop.processChoice = title.customCrop.PROCESS_AUTOMATIC
+        else:
+            title.customCrop.processChoice = title.customCrop.PROCESS_CUSTOM
+
+        self.__discTitle_cropWidgets.setCropFromWidgets(title.customCrop)
 
     def onAction_EditPreferences(self):
         """Edit the application preferences."""
@@ -1476,20 +1717,12 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """ Create an xml file using the disc hash.  The file will contain the disc
             information and the disc state data.
         """
-
-        # wx.GetApp().SaveSession()
-        # wx.GetApp().SetAutoSessionFilename()
-        # wx.GetApp().SaveSession()
-        # self.NewSessionFile()
-        #
-        # self.ShowMessage("Hash session saved.")
-
         self.__SaveSession(QApplication.instance().hashSessionFilename)
 
     # TODO create class for cells and size information (separate classes)
     # TODO base cells, size, crop classes on list, set?
 
-    def onVLC(self):
+    def onButton_VLC(self):
         """ Start VLC using the source path.
         """
 
