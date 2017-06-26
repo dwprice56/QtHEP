@@ -17,7 +17,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import os.path, pathlib, sys, xml.dom, xml.dom.minidom as minidom
+
 # import time
+from collections import namedtuple
 
 sys.path.insert(0, '/home/dave/QtProjects/Helpers')
 sys.path.insert(0, '/home/dave/QtProjects/DiscData')
@@ -49,7 +51,8 @@ from PyQt5WidgetDataConnectors import (
     QLineEditDataConnector,
     QPlainTextEditDataConnector,
     QRadioButtonGroupDataConnector,
-    QSpinBoxDataConnector
+    QSpinBoxDataConnector,
+    QTableWidgetItemDataConnector
 )
 
 from PyQt5OverrideCursor import QWaitCursor
@@ -88,10 +91,57 @@ from Titles import (
 )
 from PyHelpers import NormalizeFileName
 
+VerticalHeadersVisible = namedtuple('VerticalHeadersVisible', ['firstVisualIndex',
+    'lastVisualIndex', 'currentRowVisualIndex'])
+
 def BoolToQtChecked(arg):
     if (arg):
         return Qt.Checked
     return Qt.Unchecked
+
+class Disc_Source_Validator(QLineEdit_FolderExists_Validator):
+    """ A specialized validator for the video source QLineEdit widget.
+
+        In addition to the source folder existing, it must have a VIDEO_TS
+        subfolder.
+    """
+
+    def __init__(self, widget):
+        super(Disc_Source_Validator, self).__init__(widget,
+            message = 'The Source field is either blank or does not point to a valid folder.')
+
+    def isValid(self):
+        """ The field is valid if:
+                1) The field is not blank.
+                2) The value in the field is a valid folder.
+                3) The folder has a VIDEO_TS subfolder.
+
+            If the field is not valid:
+                1) Highlight the field.
+                2) Display an error message
+                3) Return False
+        """
+        if (not super(Disc_Source_Validator, self).isValid()):
+            return False
+
+        if ((self._flags & self.FLAG_DISABLED_WIDGET_ALWAYS_VALID)
+            and (not self._widget.isEnabled())):
+            return True
+
+        folder = os.path.join(self._widget.text(), 'VIDEO_TS')
+        if (folder):
+            path = pathlib.Path(folder)
+            if (path.is_dir()):
+                return True
+
+        if (self._flags & self.FLAG_HIGHLIGHT_WIDGETS_WITH_ERRORS):
+            self.setHighlight()
+
+        if (self._flags & self.FLAG_SHOW_ERROR_MESSAGE):
+            QMessageBox.critical(QApplication.instance().mainWindow, self._errorTitle,
+                'The source folder does not have a VIDEO_TS subfolder.')
+
+        return False
 
 class MyMainWindow(QMainWindow, Ui_MainWindow):
 
@@ -99,14 +149,24 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     WIDGET_GROUP_DISC_AUTO_SUBTITLE = 0x0002
     WIDGET_GROUP_DISC_CROP          = 0x0004
 
+    TAB_INDEX_TITLE_DETAILS  = 0
+    TAB_INDEX_CHAPTERS       = 1
+    TAB_INDEX_CHAPTER_RANGES = 2
+    TAB_INDEX_AUDIO_TRACKS   = 3
+    TAB_INDEX_SUBTITLES      = 4
+    TAB_INDEX_CROPPING       = 5
+
     def __init__(self, parent=None):
         super(MyMainWindow, self).__init__(parent)
         self.setupUi(self)
 
-        # self.highlightedTabIcon = QIcon('images/draw_ellipse_16.png')
-        self.highlightedTabIcon = QIcon('images/diamond_16.png')
+        # self.__tabIcon_Highlight = QIcon('images/draw_ellipse_16.png')
+        self.__tabIcon_Clear = QIcon()
+        self.__tabIcon_Highlight = QIcon('images/diamond_16.png')
 
         self.__widgetDataConnectors = WidgetDataConnectors()
+        self.__titleSelection_widgetDataConnectors = WidgetDataConnectors()
+
         self.__disc_audioTrackWidgets = AudioTrackWidgetsList(self)
         self.__disc_subtitleTrackWidgets = SubtitleTrackWidgetsList(self)
         self.__disc_cropWidgets = CropWidgets(self,
@@ -120,18 +180,21 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.actionBrowse_for_Video.triggered.connect(self.onAction_Disc_Source_Browse)
         self.actionBrowse_for_Destination.triggered.connect(self.onAction_Disc_Destination_Browse)
-        self.actionSave_Hash_Session.triggered.connect(self.onSaveHashSession)
+        self.actionSave_Hash_Session.triggered.connect(self.onAction_Disc_Save_HashSession)
         self.actionPreferences.triggered.connect(self.onAction_EditPreferences)
         self.actionQuit.triggered.connect(QApplication.instance().quit)
 
-        self.__initDiscFields()
-        self.__initDiscFilenameAndNotesFields()
+        self.__init_Disc_Fields()
+        self.__init_Disc_FilenameAndNotesFields()
         self.__widgetDataConnectors.append(QComboBoxDataConnector(
             self.comboBox_Disc_Preset, self.disc, 'preset'))
-        self.__initDiscAudioTracks()
-        self.__initDiscSubtitleTracks()
-        self.__initDiscCropping()
-        self.__initDiscTitleDetailWidgets()
+        self.__widgetDataConnectors.append(QCheckBoxDataConnector(
+            self.checkBox_Disc_HideShortTitles, self.disc, 'hideShortTitles'))
+        self.checkBox_Disc_HideShortTitles.toggled.connect(self.onSignal_toggled_Disc_HideShortTitles)
+        self.__init_Disc_AudioTracks()
+        self.__init_Disc_SubtitleTracks()
+        self.__init_Disc_Cropping()
+        self.__init_DiscTitle_DetailWidgets()
 
         self.__disc_audioTrackWidgets.addTrackItems(AudioTrackState.AUDIO_TRACK_CHOICES)
         self.__disc_subtitleTrackWidgets.addTrackItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
@@ -140,22 +203,48 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.Load_Disc_FilenameTemplates()
         self.Load_Disc_Presets()
-        # self.Load_Disc_MixdownTrackNumbers()
         self.Load_Disc_Mixdowns()
-        # self.Load_Disc_SubtitleTrackNumbers()
-        # self.Load_DiscTitle_MixdownTrackNumbers()
         self.Load_DiscTitle_Mixdowns()
 
-    def __initDiscAudioTracks(self):
+        self.Enable_Disc()
+
+    def Enable_Disc(self):
+        """ Enable/disable widgets throughout the main window.
+        """
+
+        enableWidgets = self.disc.titles.HasTitles()
+
+        self.groupBox_Disc_Notes.setEnabled(enableWidgets)
+        self.groupBox_Disc_AudioTracks.setEnabled(self.disc.titles.HasAudioTrack())
+        self.groupBox_Disc_SubtitleTracks.setEnabled(self.disc.titles.HasSubtitleTrack())
+        self.groupBox_Disc_Crop.setEnabled(enableWidgets)
+        self.frame_DiscTitle_List.setEnabled(enableWidgets)
+
+        # Disable the individual tabs instead of the entire tab widget so the
+        # user can still flip through the tabs.
+        for idx in range(self.tabWidget_DiscTitle.count()):
+            self.tabWidget_DiscTitle.widget(idx).setEnabled(enableWidgets)
+
+    def getTitleRow(self, title):
+        """ Return the row in the tableWidget_Disc_Titles for the title.
+        """
+        for idx in range(self.tableWidget_Disc_Titles.rowCount()):
+            rowTitle = self.tableWidget_Disc_Titles.item(idx, 0).data(Qt.UserRole)
+
+            if (title.titleNumber == rowTitle.titleNumber):
+                return idx
+
+        return None
+
+    def __init_Disc_AudioTracks(self):
         """ For the disc audio track widgets:
 
                 * Connect the buttons.
                 * Create the widget/data connectors.
                 * Create the validators.
         """
-
         # TODO enable/disable this button if title count > 0
-        self.toolButton_Disc_Find_AudioTracks.clicked.connect(self.onDisc_Find_AudioTracks)
+        self.toolButton_Disc_Find_AudioTracks.clicked.connect(self.onButton_Disc_AudioTracks_Find)
 
         # Connect the widgets to the data items.
         # ======================================================================
@@ -226,7 +315,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # TODO make sure all of the selected audio tracks exist in all of the selected titles.
         # TODO make sure at least on mixdown is selected
 
-    def __initDiscCropping(self):
+    def __init_Disc_Cropping(self):
         """ For the disc cropping widgets:
 
                 * Connect the buttons.
@@ -235,7 +324,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """
 
         # TODO enable/disable this button if title count > 0
-        self.toolButton_Disc_Find_Crop.clicked.connect(self.onDisc_Find_Crop)
+        self.toolButton_Disc_Find_Crop.clicked.connect(self.onButton_Disc_Cropping_Find)
         self.radioButton_Disc_Crop_Automatic.setChecked(True)   # Forces the disc cropping spin buttons to disabled.
 
         # Connect the widgets to the data items.
@@ -276,7 +365,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # TODO make sure all of the selected audio tracks exist in all of the selected titles.
         # TODO make sure at least on mixdown is selected
 
-    def __initDiscFields(self):
+    def __init_Disc_Fields(self):
         """ For the disc widgets:
 
                 * Connect the buttons.
@@ -291,17 +380,17 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.pushButton_Disc_Source_Browse.clicked.connect(self.onAction_Disc_Source_Browse)
         self.pushButton_Disc_Destination_Browse.clicked.connect(self.onAction_Disc_Destination_Browse)
 
-        self.toolButton_Disc_Source_Read.clicked.connect(self.onDisc_Source_Read)
-        self.toolButton_Disc_Source_Find.clicked.connect(self.onDisc_Source_Find)
+        self.toolButton_Disc_Source_Read.clicked.connect(self.onButton_Disc_Source_Read)
+        self.toolButton_Disc_Source_Find.clicked.connect(self.onButton_Disc_Source_Find)
         # I'm sure there was a reason for this at some point, but I really can't remember why the hash would ever need to be re-calculated.
         # Oddly, the ui designer does not allow you to set the visible attribute.
         self.toolButton_Disc_UpdateHash.setVisible(False)
-        self.toolButton_Disc_RunVLC.clicked.connect(self.onButton_VLC)
+        self.toolButton_Disc_RunVLC.clicked.connect(self.onButton_Disc_VLC)
 
         # Volume labels are only available under Windows.
         self.toolButton_Disc_GetSourceDiskLabel.setVisible(sys.platform == 'win32')
-        self.toolButton_Disc_GetSourceDiskLabel.clicked.connect(self.onGetSourceDiskLabel)
-        self.toolButton_Disc_EditSourceDiskLabel.clicked.connect(self.onEditSourceDiskLabel)
+        self.toolButton_Disc_GetSourceDiskLabel.clicked.connect(self.onButton_Disc_SourceDiskLabel_Get)
+        self.toolButton_Disc_EditSourceDiskLabel.clicked.connect(self.onButton_Disc_SourceDiskLabel_Edit)
 
         # Connect the widgets to the data items.
         # ======================================================================
@@ -320,8 +409,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # Create the validators.
         # ======================================================================
 
-        self.Validator_Disc_Source = QLineEdit_FolderExists_Validator(self.lineEdit_Disc_Source,
-            message = 'The Source field is either blank or does not point to a valid folder.')
+        self.Validator_Disc_Source = Disc_Source_Validator(self.lineEdit_Disc_Source)
         self.Validator_Disc_Destination = QLineEdit_FolderExists_Validator(self.lineEdit_Disc_Destination,
             message = 'The Destination field is either blank or does not point to a valid folder.')
 
@@ -329,7 +417,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             message = 'The Disc label field may not be blank.')
         self.Validator_Disc_DiskLabel.removeFlags(self.Validator_Disc_DiskLabel.FLAG_DISABLED_WIDGET_ALWAYS_VALID)
 
-    def __initDiscFilenameAndNotesFields(self):
+    def __init_Disc_FilenameAndNotesFields(self):
         """ For the disc filename and note widgets:
 
                 * Connect the buttons.
@@ -337,8 +425,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 * Create the validators.
         """
 
-        self.toolButton_ResetFirstEpisode.clicked.connect(self.onDisc_Reset_FirstEpisode)
-        self.toolButton_ResetEpisodeNumberPrecision.clicked.connect(self.onDisc_Reset_EpisodeNumberPrecision)
+        self.toolButton_ResetFirstEpisode.clicked.connect(self.onButton_Disc_Reset_FirstEpisode)
+        self.toolButton_ResetEpisodeNumberPrecision.clicked.connect(self.onButton_Disc_Reset_EpisodeNumberPrecision)
 
         # Connect the widgets to the data items.
         # ======================================================================
@@ -364,7 +452,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.Validator_Disc_Mask = QComboBox_NotEmpty_Validator(self.comboBox_Disc_Mask,
             message = 'The File Name Mask field must not be blank.')
 
-    def __initDiscSubtitleTracks(self):
+    def __init_Disc_SubtitleTracks(self):
         """ For the disc subtitle track widgets:
 
                 * Connect the buttons.
@@ -373,7 +461,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """
 
         # TODO enable/disable this button if title count > 0
-        self.toolButton_Disc_Find_SubtitleTrack.clicked.connect(self.onDisc_Find_SubtitleTracks)
+        self.toolButton_Disc_Find_SubtitleTrack.clicked.connect(self.onButton_Disc_SubtitleTracks_Find)
 
         # Connect the widgets to the data items.
         # ======================================================================
@@ -466,7 +554,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # TODO make sure all of the selected audio tracks exist in all of the selected titles.
         # TODO make sure at least on mixdown is selected
 
-    def __initDiscTitleDetailWidgets(self):
+    def __init_DiscTitle_DetailWidgets(self):
         """ Initialze the widgets used to display the detail information for a
             title.
         """
@@ -476,7 +564,16 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             ['Select', 'Title #', 'Duration', 'Aspect', 'Title Name'])
 
         self.tableWidget_Disc_Titles.itemSelectionChanged.connect(self.onDisc_Titles_ItemSelectionChanged)
-        self.tableWidget_Disc_Titles.currentItemChanged.connect(self.onDisc_Titles_CurrentItemChanged)
+        # self.tableWidget_Disc_Titles.currentItemChanged.connect(self.onDisc_Titles_CurrentItemChanged)
+
+        self.toolButton_DiscTitle_MoveBottom.clicked.connect(self.onButton_DiscTitle_MoveBottom)
+        self.toolButton_DiscTitle_MoveDown.clicked.connect(self.onButton_DiscTitle_MoveDown)
+        self.toolButton_DiscTitle_MoveTop.clicked.connect(self.onButton_DiscTitle_MoveTop)
+        self.toolButton_DiscTitle_MoveUp.clicked.connect(self.onButton_DiscTitle_MoveUp)
+        self.toolButton_DiscTitle_RestoreNaturalOrder.clicked.connect(self.onButton_DiscTitle_RestoreNaturalOrder)
+
+        self.toolButton_DiscTitle_ClearSelections.clicked.connect(self.onButton_DiscTitle_ClearSelections)
+        self.toolButton_Disc_Find_AudioAndSubtitleTracks.clicked.connect(self.onButton_Disc_AudioAndSubtitleTracks_Find)
 
         # The table displaying the detail information for the selected title.
         # ======================================================================
@@ -504,21 +601,21 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         # The table displaying the list of chapters for the selected title.
         # ======================================================================
-        self.toolButton_Disc_Chapters_ResetFirstChapter.clicked.connect(self.onDisc_Chapters_ResetFirstChapter)
-        self.pushButton_Disc_Chapters_ImportChapterNames.clicked.connect(self.onDisc_Chapters_ImportChapterNames)
-        self.pushButton_Disc_Chapters_ResetNames.clicked.connect(self.onDisc_Chapters_ResetNames)
-        self.pushButton_Disc_Chapters_ExportChapterNames.clicked.connect(self.onDisc_Chapters_ExportChapterNames)
-        self.pushButton_Disc_Chapters_SetTitleEnd.clicked.connect(self.onDisc_Chapters_SetTitleEnd)
+        self.toolButton_DiscTitle_Chapters_ResetFirstChapter.clicked.connect(self.onButton_DiscTitle_Chapters_ResetFirstChapter)
+        self.pushButton_DiscTitle_Chapters_ImportNames.clicked.connect(self.onButton_DiscTitle_Chapters_ImportNames)
+        self.pushButton_DiscTitle_Chapters_ResetNames.clicked.connect(self.onButton_DiscTitle_Chapters_ResetNames)
+        self.pushButton_DiscTitle_Chapters_ExportNames.clicked.connect(self.onButton_DiscTitle_Chapters_ExportNames)
+        self.pushButton_DiscTitle_Chapters_SetTitleEnd.clicked.connect(self.onButton_DiscTitle_Chapters_SetTitleEnd)
 
-        self.radioButton_Disc_Chapters_NoMarkers.clicked.connect(self.onDiscTitle_EnbableChapterWidgets)
-        self.radioButton_Disc_Chapters_IncludeMarkers.clicked.connect(self.onDiscTitle_EnbableChapterWidgets)
-        self.radioButton_Disc_Chapters_IncludeNames.clicked.connect(self.onDiscTitle_EnbableChapterWidgets)
+        self.radioButton_DiscTitle_Chapters_NoMarkers.clicked.connect(self.onDiscTitle_Chapters_EnableWidgets)
+        self.radioButton_DiscTitle_Chapters_IncludeMarkers.clicked.connect(self.onDiscTitle_Chapters_EnableWidgets)
+        self.radioButton_DiscTitle_Chapters_IncludeNames.clicked.connect(self.onDiscTitle_Chapters_EnableWidgets)
 
         self.__StandardTableWidgetInitialization(self.tableWidget_Disc_Chapters,
             ['Chapter #', 'Cells', 'Duration', 'Chapter Name'])
 
-        self.radioButton_Disc_Chapters_IncludeMarkers.setChecked(True)      # Set this to enable/disable chapter controls
-        self.onDiscTitle_EnbableChapterWidgets()
+        self.radioButton_DiscTitle_Chapters_IncludeMarkers.setChecked(True)      # Set this to enable/disable chapter controls
+        self.onDiscTitle_Chapters_EnableWidgets()
 
         # The widgets displaying the chapter ranges and episodes for the selected title.
         # ======================================================================
@@ -528,9 +625,9 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.toolButton_DiscTitle_DeleteEpisode.clicked.connect(self.onButton_DiscTitle_DeleteEpisode)
         self.toolButton_DiscTitle_Episodes_DeleteAll.clicked.connect(self.onButton_DiscTitle_Episodes_DeleteAll)
 
-        self.radioButton_DiscTitle_AllChapters.clicked.connect(self.onDiscTitle_EnableChapterRangeWidgets)
-        self.radioButton_DiscTitle_ChapterRange.clicked.connect(self.onDiscTitle_EnableChapterRangeWidgets)
-        self.radioButton_DiscTitle_Episodes.clicked.connect(self.onDiscTitle_EnableChapterRangeWidgets)
+        self.radioButton_DiscTitle_AllChapters.clicked.connect(self.onDiscTitle_ChapterRanges_EnableWidgets)
+        self.radioButton_DiscTitle_ChapterRange.clicked.connect(self.onDiscTitle_ChapterRanges_EnableWidgets)
+        self.radioButton_DiscTitle_Episodes.clicked.connect(self.onDiscTitle_ChapterRanges_EnableWidgets)
 
         self.__StandardTableWidgetInitialization(self.tableWidget_DiscTitle_Episodes,
             ['First Chapter', 'Last Chapter', 'Title'])
@@ -540,15 +637,15 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.tableWidget_DiscTitle_Episodes.setItemDelegateForColumn(1, self.DiscTitle_Episodes_SpinBoxDelegate)
 
         self.radioButton_DiscTitle_AllChapters.setChecked(True)      # Set this to enable/disable chapter controls
-        self.onDiscTitle_EnableChapterRangeWidgets()
+        self.onDiscTitle_ChapterRanges_EnableWidgets()
 
         # The widgets on the Title Audio Tracks tab.
         # ======================================================================
         self.toolButton_DiscTitle_AudioTracks_Clear.clicked.connect(self.onButton_DiscTitle_AudioTracks_Clear)
         self.toolButton_DiscTitle_AudioTracks_Find.clicked.connect(self.onButton_DiscTitle_AudioTracks_Find)
 
-        self.radioButton_DiscTitle_AudioTracks_Default.clicked.connect(self.onDiscTitle_EnableAudioTracksWidgets)
-        self.radioButton_DiscTitle_AudioTracks_Custom.clicked.connect(self.onDiscTitle_EnableAudioTracksWidgets)
+        self.radioButton_DiscTitle_AudioTracks_Default.clicked.connect(self.onDiscTitle_AudioTracks_EnableWidgets)
+        self.radioButton_DiscTitle_AudioTracks_Custom.clicked.connect(self.onDiscTitle_AudioTracks_EnableWidgets)
 
         self.__discTitle_audioTrackWidgets.append(AudioTrackWidgets(
             self.__discTitle_audioTrackWidgets, 0,
@@ -570,15 +667,15 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         ))
 
         self.radioButton_DiscTitle_AudioTracks_Default.setChecked(True)      # Set this to enable/disable chapter controls
-        self.onDiscTitle_EnableAudioTracksWidgets()
+        self.onDiscTitle_AudioTracks_EnableWidgets()
 
         # The widgets on the Title Subtitle Tracks tab.
         # ======================================================================
         self.toolButton_DiscTitle_SubtitleTracks_Clear.clicked.connect(self.onButton_DiscTitle_SubtitleTracks_Clear)
         self.toolButton_DiscTitle_SubtitleTracks_Find.clicked.connect(self.onButton_DiscTitle_SubtitleTracks_Find)
 
-        self.radioButton_DiscTitle_SubtitleTracks_Default.clicked.connect(self.onDiscTitle_EnableSubtitleTracksWidgets)
-        self.radioButton_DiscTitle_SubtitleTracks_Custom.clicked.connect(self.onDiscTitle_EnableSubtitleTracksWidgets)
+        self.radioButton_DiscTitle_SubtitleTracks_Default.clicked.connect(self.onDiscTitle_SubtitleTracks_EnableWidgets)
+        self.radioButton_DiscTitle_SubtitleTracks_Custom.clicked.connect(self.onDiscTitle_SubtitleTracks_EnableWidgets)
 
         self.__discTitle_subtitleTrackWidgets.append(SubtitleTrackWidgets(
             self.__discTitle_subtitleTrackWidgets, 0,
@@ -603,16 +700,16 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         ))
 
         self.radioButton_DiscTitle_SubtitleTracks_Default.setChecked(True)      # Set this to enable/disable chapter controls
-        self.onDiscTitle_EnableSubtitleTracksWidgets()
+        self.onDiscTitle_SubtitleTracks_EnableWidgets()
 
         # The widgets on the Title Cropping tab.
         # ======================================================================
         self.toolButton_DiscTitle_Crop_Clear.clicked.connect(self.onButton_DiscTitle_Crop_Clear)
         self.toolButton_DiscTitle_Crop_Find.clicked.connect(self.onButton_DiscTitle_Crop_Find)
 
-        self.radioButton_DiscTitle_Crop_Default.clicked.connect(self.onDiscTitle_EnableCropWidgets)
-        self.radioButton_DiscTitle_Crop_Automatic.clicked.connect(self.onDiscTitle_EnableCropWidgets)
-        self.radioButton_DiscTitle_Crop_Custom.clicked.connect(self.onDiscTitle_EnableCropWidgets)
+        self.radioButton_DiscTitle_Crop_Default.clicked.connect(self.onDiscTitle_Cropping_EnableWidgets)
+        self.radioButton_DiscTitle_Crop_Automatic.clicked.connect(self.onDiscTitle_Cropping_EnableWidgets)
+        self.radioButton_DiscTitle_Crop_Custom.clicked.connect(self.onDiscTitle_Cropping_EnableWidgets)
 
         # self.__discTitle_cropWidgets.append(SubtitleTrackWidgets(
         #     self.__discTitle_subtitleTrackWidgets, 0,
@@ -623,7 +720,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # ))
 
         self.radioButton_DiscTitle_Crop_Default.setChecked(True)      # Set this to enable/disable chapter controls
-        self.onDiscTitle_EnableCropWidgets()
+        self.onDiscTitle_Cropping_EnableWidgets()
 
     @property
     def disc(self):
@@ -639,7 +736,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """ Returns the currently active title.
 
             The active title is attached to the first cell in the
-            tableWidget_Disc_Title widget as UserRoll data.
+            tableWidget_Disc_Title widget as UserRole data.
 
             If warnIfNone is True (the default) a warning message will be
             displayed when a title does not exist.
@@ -662,31 +759,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.comboBox_Disc_Mask.setCurrentText(text)
 
-    def Load_Disc_Presets(self):
-        """ Load the presets QComboBox from the preferences.
-        """
-
-        text = self.comboBox_Disc_Preset.currentText()
-
-        self.comboBox_Disc_Preset.clear()
-        for preset in self.preferences.presets:
-            self.comboBox_Disc_Preset.addItem(preset.name)
-
-        self.comboBox_Disc_Preset.setCurrentText(text)
-
-    def Load_Disc_MixdownTrackNumbers(self):
-        """ Load the titles mixdown track ComboBoxes from the preferences.
-        """
-
-        # TODO use real track number from the Disc?  Must use highest available track number,
-        #   can't change this per title because it applies to all titles.
-        #   Probably not worth the effort.  If not, move this to __initDiscAudioTracks.
-        #   Should these be spinboxes instead?
-
-        self.comboBox_Disc_AudioTracks_SelectTrack_First.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-        self.comboBox_Disc_AudioTracks_SelectTrack_Second.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-        self.comboBox_Disc_AudioTracks_SelectTrack_Third.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-
     def Load_Disc_Mixdowns(self):
         """ Load the titles mixdown ComboBoxes from the preferences.
         """
@@ -699,6 +771,31 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.__disc_audioTrackWidgets.addMixdownItems(mixdowns)
 
         self.groupBox_Disc_AudioTracks.updateGeometry()
+
+    # def Load_Disc_MixdownTrackNumbers(self):
+    #     """ Load the titles mixdown track ComboBoxes from the preferences.
+    #     """
+    #
+    #     # TODO use real track number from the Disc?  Must use highest available track number,
+    #     #   can't change this per title because it applies to all titles.
+    #     #   Probably not worth the effort.  If not, move this to __init_Disc_AudioTracks.
+    #     #   Should these be spinboxes instead?
+    #
+    #     self.comboBox_Disc_AudioTracks_SelectTrack_First.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
+    #     self.comboBox_Disc_AudioTracks_SelectTrack_Second.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
+    #     self.comboBox_Disc_AudioTracks_SelectTrack_Third.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
+
+    def Load_Disc_Presets(self):
+        """ Load the presets QComboBox from the preferences.
+        """
+
+        text = self.comboBox_Disc_Preset.currentText()
+
+        self.comboBox_Disc_Preset.clear()
+        for preset in self.preferences.presets:
+            self.comboBox_Disc_Preset.addItem(preset.name)
+
+        self.comboBox_Disc_Preset.setCurrentText(text)
 
     # def Load_Disc_SubtitleTrackNumbers(self):
     #     """ Load the titles mixdown track ComboBoxes from the preferences.
@@ -713,7 +810,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     #     """
     #
     #     # TODO use real track number from the Disc?  Must use highest available track number, can't change this per title because it applies to all titles.
-    #     #       Probably not worth the effort.  If not, move this to __initDiscAudioTracks.
+    #     #       Probably not worth the effort.  If not, move this to __init_Disc_AudioTracks.
     #
     #     self.comboBox_DiscTitle_AudioTracks_SelectTrack_First.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
     #     self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
@@ -745,7 +842,321 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         AddItemToTableWidgetCell(self.tableWidget_DiscTitle_Episodes, idx, 2,
             episode.title, textAlignment=None)
 
-    def onDisc_Chapters_ExportChapterNames(self):
+    # TODO When enabling/disabling the All/Range/Episode radio buttons don't enable
+    # the buttons if self.activeTitle() is None.
+    # TODO Validate source - make sure the source folder has a VIDEO_TS folder.
+
+    def onAction_Disc_Destination_Browse(self):
+        """ Select a folder where the transcoded video files will be saved.
+        """
+        destinationFolder = QFileDialog.getExistingDirectory(self,
+            'Select Destination Folder', self.lineEdit_Disc_Destination.text())
+        if (not destinationFolder):
+            return
+
+        self.lineEdit_Disc_Destination.setText(destinationFolder)
+        self.Validator_Disc_Destination.clearHighlight()
+
+    def onAction_Disc_Save_HashSession(self):
+        """ Create an xml file using the disc hash.  The file will contain the disc
+            information and the disc state data.
+        """
+        self.__SaveSession(QApplication.instance().hashSessionFilename)
+
+    def onAction_Disc_Source_Browse(self):
+        """ Find a video folder with containing a copy of a DVD or BluRay disc
+            and read the disc with Handbrake.  Then parse the disc information.
+        """
+        sourceFolder = QFileDialog.getExistingDirectory(self,
+            'Select Video Folder', self.lineEdit_Disc_Source.text())
+        if (not sourceFolder):
+            return
+
+        self.lineEdit_Disc_Source.setText(sourceFolder)
+        # self.lineEdit_Disc_Source.setStyleSheet('')
+        if (not self.Validator_Disc_Source.isValid()):
+            return
+
+        self.disc.source = sourceFolder
+
+        if (not self.__ReadSource()):
+            return
+
+        self.__onNewSource()
+
+        self.TransferToWindow()
+
+    def onAction_EditPreferences(self):
+        """Edit the application preferences."""
+
+        dlg = PreferencesDialog(self.preferences, self)
+        dlg.TransferToWindow()
+        result = dlg.exec_()
+        if (result):
+            dlg.TransferFromWindow()
+            QApplication.instance().SavePreferences()
+            QApplication.instance().preferences.logging.InitLog()
+
+            self.Load_Disc_FilenameTemplates()
+            self.Load_Disc_Presets()
+            self.Load_Disc_Mixdowns()
+            self.Load_DiscTitle_Mixdowns()
+
+            DiscFilenameTemplatesSingleton().Set(self.preferences.filenameTemplates)
+            DiscPresetsSingleton().Set(self.preferences.presets.GetNames())
+            TitleVisibleSingleton().minimumTitleSeconds = self.preferences.autoTitle.minimumTitleSeconds
+
+            log = SingletonLog()
+            log.writeline('Preferences updated')
+
+            # TODO status bar message x2
+
+    def onButton_Disc_AudioTracks_Find(self):
+        """ Find the audio track and mixdown settings for the first visible,
+            selected title.  Then set the disc audio track states and update the
+            widgets.
+
+            Use the default title is nothing matches.
+        """
+        self.__titleSelection_widgetDataConnectors.transferFromWidgets()
+
+        matchingTitles = self.disc.titles.GetMatchingTitles(Titles.FLAG_SELECTED
+            | Titles.FLAG_VISIBLE)
+
+        if (len(matchingTitles.matchingTitles)):
+            matchingTitle = matchingTitles.matchingTitles[0]
+        else:
+            matchingTitle = matchingTitles.defaultTitle
+
+        self.disc.audioTrackStates.AutoSet_From_AudioTracks(
+            matchingTitle.audioTracks,
+            self.preferences)
+
+        self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_AUDIO)
+        self.statusBar.showMessage('Audio track selections updated.', 15000)
+
+    def onButton_Disc_AudioAndSubtitleTracks_Find(self):
+        """ Find the audio track & mixdown and the subtitle track settings for
+            the first visible, selected title.  Then set the disc audio track
+            states and update the widgets.
+
+            Use the default title is nothing matches.
+        """
+        self.__titleSelection_widgetDataConnectors.transferFromWidgets()
+
+        matchingTitles = self.disc.titles.GetMatchingTitles(Titles.FLAG_SELECTED
+            | Titles.FLAG_VISIBLE)
+
+        if (len(matchingTitles.matchingTitles)):
+            matchingTitle = matchingTitles.matchingTitles[0]
+        else:
+            matchingTitle = matchingTitles.defaultTitle
+
+        self.disc.audioTrackStates.AutoSet_From_AudioTracks(
+            matchingTitle.audioTracks,
+            self.preferences)
+        self.disc.subtitleTrackStates.AutoSet_From_SubtitleTracks(
+            matchingTitle.subtitleTracks,
+            self.preferences)
+
+        self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_AUDIO)
+        self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_SUBTITLE)
+        self.statusBar.showMessage('Audio track selections updated.', 15000)
+
+    def onButton_Disc_Cropping_Find(self):
+        """ Find the cropping values for the first selected title. Then set the
+            disc cropping values and update the widgets.
+
+            Use the default title is nothing matches.
+        """
+        self.__titleSelection_widgetDataConnectors.transferFromWidgets()
+
+        matchingTitles = self.disc.titles.GetMatchingTitles(Titles.FLAG_SELECTED
+            | Titles.FLAG_VISIBLE)
+
+        if (len(matchingTitles.matchingTitles)):
+            matchingTitle = matchingTitles.matchingTitles[0]
+        else:
+            matchingTitle = matchingTitles.defaultTitle
+
+        self.disc.customCrop.Copy(matchingTitle.autoCrop)
+        self.disc.customCrop.processChoice = self.disc.customCrop.PROCESS_AUTOMATIC
+
+        self.TransferToWindow(self.WIDGET_GROUP_DISC_CROP)
+        self.statusBar.showMessage('Cropping selections updated.', 15000)
+
+    def onButton_Disc_Reset_EpisodeNumberPrecision(self):
+        """ Reset the first episode number precision to it's default value.
+        """
+        self.spinBox_Disc_EpisodeNumberPrecision.setValue(self.disc.DEFAULT_EPISODE_NUMBER_PRECISION)
+
+    def onButton_Disc_Reset_FirstEpisode(self):
+        """ Reset the first episode number to it's default value.
+        """
+        self.spinBox_Disc_FirstEpisode.setValue(self.disc.DEFAULT_FIRST_EPISODE_NUMBER)
+
+    def onButton_Disc_Source_Find(self):
+        """ Find a video folder with containing a copy of a DVD or BluRay disc.
+            DO NOT read the disc with Handbrake.  DO NOT parse the disc information.
+        """
+        sourceFolder = QFileDialog.getExistingDirectory(self,
+            'Find Video Folder', self.lineEdit_Disc_Source.text())
+        if (not sourceFolder):
+            return
+
+        self.lineEdit_Disc_Source.setText(sourceFolder)
+        self.lineEdit_Disc_Source.setStyleSheet('')
+        self.disc.source = sourceFolder
+
+    def onButton_Disc_Source_Read(self):
+        """ Re-read the disc with Handbrake.  Then parse the disc information.
+        """
+
+        if (not self.Validator_Disc_Source.isValid()):
+            return
+
+        if (not self.__ReadSource()):
+            return
+
+        # TODO default destination was not set.
+
+        self.TransferToWindow()
+
+    def onButton_Disc_SourceDiskLabel_Edit(self):
+        """ Get the disk label from the user.
+        """
+        text, ok  = QInputDialog.getText(self, 'Set Disk Volume Label', 'Volume label',
+            text = self.lineEdit_Disc_DiskLabel.text())
+
+        if (ok):
+            self.lineEdit_Disc_DiskLabel.setText(text)
+            self.Validator_Disc_DiskLabel.clearHighlight()
+
+    def onButton_Disc_SourceDiskLabel_Get(self):
+        """ Get the volume label for the disk where the source is located.
+
+            Only Windows disks have volume labels.
+        """
+        if (sys.platform == 'win32'):
+            volumeLabel = GetVolumeLabel(lineEdit_Disc_Source.text())
+            self.lineEdit_Disc_DiskLabel.setText(volumeLabel)
+
+    def onButton_Disc_SubtitleTracks_Find(self):
+        """ Find the Subtitle track for the first selected title. Then set the
+            disc subtitle track states and update the widgets.
+
+            Use the default title is nothing matches.
+        """
+        self.__titleSelection_widgetDataConnectors.transferFromWidgets()
+
+        matchingTitles = self.disc.titles.GetMatchingTitles(Titles.FLAG_SELECTED
+            | Titles.FLAG_VISIBLE)
+
+        if (len(matchingTitles.matchingTitles)):
+            matchingTitle = matchingTitles.matchingTitles[0]
+        else:
+            matchingTitle = matchingTitles.defaultTitle
+
+        self.disc.subtitleTrackStates.AutoSet_From_SubtitleTracks(
+            matchingTitle.subtitleTracks,
+            self.preferences)
+
+        self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_SUBTITLE)
+        self.statusBar.showMessage('Subtitle track selections updated.', 15000)
+
+
+        # TODO subtitle tracks validators - if burn, focus or default checked then corresponding combobox must have a track selected.
+
+    def onButton_Disc_VLC(self):
+        """ Start VLC using the source path.
+        """
+
+        if (not self.Validator_Disc_Source.isValid()):
+            return
+
+        # process = QProcess(QApplication.instance())
+        started = QProcess.startDetached('"{}" "{}"'.format(self.preferences.executables.VLC, self.lineEdit_Disc_Source.text()))
+
+        if (not started):
+            QMessageBox.critical(self, 'Run Error',
+                'An error has occurred while running VLC.\nVLC did not start.')
+            return False
+
+    def onButton_DiscTitle_AddEpisode(self):
+        """ Add a chapter episode.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        episode = title.chapterRanges.AddEpisode(title.chapters.lowestChapterNumber,
+            title.chapters.highestChapterNumber, 'new episode')
+
+        idx = self.tableWidget_DiscTitle_Episodes.rowCount()
+        self.tableWidget_DiscTitle_Episodes.setRowCount(idx + 1)
+
+        self.__NewEpisodeToTable(idx, episode)
+
+        # If row count was zero enable the range copy/delete buttons.
+        if (idx == 0):
+            self.onDiscTitle_ChapterRanges_EnableWidgets()
+
+        self.statusBar.showMessage('1 episode added.', 15000)
+
+    def onButton_DiscTitle_AudioTracks_Clear(self):
+        """ Clear the current audio track settings for the active title.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        title.audioTrackStates.clear()
+        self.__DiscTitle_AudioTrackStatesToWidgets(title)
+
+        self.onDiscTitle_AudioTracks_EnableWidgets()
+
+        self.statusBar.showMessage('Title audio track states cleared.', 15000)
+
+    def onButton_DiscTitle_AudioTracks_Find(self):
+        """ Find the current audio track settings for the active title.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        title.audioTrackStates.AutoSet_From_AudioTracks(title.audioTracks,
+            self.preferences)
+        title.audioTrackStates.processChoice = title.audioTrackStates.PROCESS_CUSTOM
+
+        self.__DiscTitle_AudioTrackStatesToWidgets(title)
+        self.onDiscTitle_AudioTracks_EnableWidgets()
+
+        self.statusBar.showMessage('Title audio track states found and set.', 15000)
+
+    def __DiscTitle_AudioTrackStatesToWidgets(self, title):
+        """ Transfer the title data to the title audio track state widgets on
+            the Audio Tracks tab.
+        """
+        if (title.audioTrackStates.processChoice == title.audioTrackStates.PROCESS_DEFAULT):
+            self.radioButton_DiscTitle_AudioTracks_Default.setChecked(True)
+        else:
+            self.radioButton_DiscTitle_AudioTracks_Custom.setChecked(True)
+
+        self.__discTitle_audioTrackWidgets.setWidgetsFromTrackStates(title.audioTrackStates)
+
+    def onButton_DiscTitle_ChapterRange_Reset(self):
+        """ Reset the chapter ranges for the selected title.
+        """
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        self.spinBox_DiscTitle_ChapterRange_First.setValue(title.chapters.lowestChapterNumber)
+        self.spinBox_DiscTitle_ChapterRange_Last.setValue(title.chapters.highestChapterNumber)
+
+        self.statusBar.showMessage('Chapter ranges reset.', 15000)
+
+    def onButton_DiscTitle_Chapters_ExportNames(self):
         """ Export the chapter names to a text file.
         """
         chapter = self.tableWidget_Disc_Chapters.item(0, 0).data(Qt.UserRole)
@@ -778,7 +1189,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.statusBar.showMessage('Chapter names exported to {}.'.format(result[0]), 15000)
 
-    def onDisc_Chapters_ImportChapterNames(self):
+    def onButton_DiscTitle_Chapters_ImportNames(self):
         """ Import chapter names from a ChaptersDB.org text file.
         """
         result = QFileDialog.getOpenFileName(self, 'Open Chapter Names File',
@@ -803,87 +1214,61 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             if (chapter.isShortChapter and chapter.isDefaultName):
                 self.tableWidget_Disc_Chapters.item(idx, 3).setData(Qt.EditRole, self.preferences.options.textImportShortChapter)
 
-        self.radioButton_Disc_Chapters_IncludeNames.setChecked(True)
-        self.onDiscTitle_EnbableChapterWidgets()
+        self.radioButton_DiscTitle_Chapters_IncludeNames.setChecked(True)
+        self.onDiscTitle_Chapters_EnableWidgets()
 
         self.statusBar.showMessage('Chapter names imported from {}.'.format(result[0]), 15000)
 
-    # TODO When enabling/disabling the All/Range/Episode radio buttons don't enable
-    # the buttons if self.activeTitle() is None.
-
-    def onButton_DiscTitle_AddEpisode(self):
-        """ Add a chapter episode.
+    def onButton_DiscTitle_Chapters_ResetFirstChapter(self):
+        """ Reset the first chapter number.
         """
-        title = self.activeTitle()
-        if (title is None):
-            return
+        self.spinBox_Disc_Chapters_FirstChapter.setValue(1)
 
-        episode = title.chapterRanges.AddEpisode(title.chapters.lowestChapterNumber,
-            title.chapters.highestChapterNumber, 'new episode')
+        self.statusBar.showMessage('First chapter number reset to 1.', 15000)
 
-        idx = self.tableWidget_DiscTitle_Episodes.rowCount()
-        self.tableWidget_DiscTitle_Episodes.setRowCount(idx + 1)
-
-        self.__NewEpisodeToTable(idx, episode)
-
-        # If row count was zero enable the range copy/delete buttons.
-        if (idx == 0):
-            self.onDiscTitle_EnableChapterRangeWidgets()
-
-        self.statusBar.showMessage('1 episode added.', 15000)
-
-    def onButton_DiscTitle_AudioTracks_Clear(self):
-        """ Clear the current audio track settings for the active title.
+    def onButton_DiscTitle_Chapters_ResetNames(self):
+        """ Reset the chapter names to their default values.
         """
-        title = self.activeTitle()
-        if (title is None):
-            return
+        for idx in range(self.tableWidget_Disc_Chapters.rowCount()):
+            chapter = self.tableWidget_Disc_Chapters.item(idx, 0).data(Qt.UserRole)
+            self.tableWidget_Disc_Chapters.item(idx, 3).setData(Qt.EditRole, chapter.defaultName)
 
-        title.audioTrackStates.clear()
-        self.__DiscTitle_AudioTrackStatesToWidgets(title)
+        self.statusBar.showMessage('Chapter names reset.', 15000)
 
-        self.onDiscTitle_EnableAudioTracksWidgets()
-
-        self.statusBar.showMessage('Title audio track states cleared.', 15000)
-
-    def onButton_DiscTitle_AudioTracks_Find(self):
-        """ Find the current audio track settings for the active title.
+    def onButton_DiscTitle_Chapters_SetTitleEnd(self):
+        """ Set the last chapter name to the preferences short title if it is a
+            short title.
         """
-        title = self.activeTitle()
-        if (title is None):
-            return
+        idx = self.tableWidget_Disc_Chapters.rowCount() - 1
+        chapter = self.tableWidget_Disc_Chapters.item(idx, 0).data(Qt.UserRole)
 
-        title.audioTrackStates.AutoSet_From_AudioTracks(title.audioTracks,
-            self.preferences)
-        title.audioTrackStates.processChoice = title.audioTrackStates.PROCESS_CUSTOM
+        if (not chapter.isShortChapter):
+            result = QMessageBox.question(self, 'Set Short Chapter',
+                'Chapter () is not a short chapter.  Do you want to continue?'.format(chapter.chapterNumber))
+            if (result != QMessageBox.Yes):
+                return
 
-        self.__DiscTitle_AudioTrackStatesToWidgets(title)
-        self.onDiscTitle_EnableAudioTracksWidgets()
+        if (self.tableWidget_Disc_Chapters.item(idx, 3).text() != chapter.defaultName):
+            result = QMessageBox.question(self, 'Set Short Chapter',
+                'The name for chapter {} is not the default name.  Do you want to continue?'.format(chapter.chapterNumber))
+            if (result != QMessageBox.Yes):
+                return
 
-        self.statusBar.showMessage('Title audio track states found and set.', 15000)
+        self.tableWidget_Disc_Chapters.item(idx, 3).setData(Qt.EditRole, self.preferences.options.textImportShortChapter)
 
-    def __DiscTitle_AudioTrackStatesToWidgets(self, title):
-        """ Transfer the title data to the title audio track state widgets on
-            the Audio Tracks tab.
+        self.statusBar.showMessage('The name for chapter {} was set to {}.'.format(chapter.chapterNumber,
+            self.preferences.options.textImportShortChapter), 15000)
+
+    def onButton_DiscTitle_ClearSelections(self):
+        """ Clear the selected attribute for all of the selected titles.
         """
-        if (title.audioTrackStates.processChoice == title.audioTrackStates.PROCESS_DEFAULT):
-            self.radioButton_DiscTitle_AudioTracks_Default.setChecked(True)
-        else:
-            self.radioButton_DiscTitle_AudioTracks_Custom.setChecked(True)
 
-        self.__discTitle_audioTrackWidgets.setWidgetsFromTrackStates(title.audioTrackStates)
+        idx = 0
+        for idx in range(self.tableWidget_Disc_Titles.rowCount()):
+            checkBox = self.tableWidget_Disc_Titles.cellWidget(idx, 0).findChild(QCheckBox, 'checkBox_DiscTitle_SelectTitle')
+            checkBox.setChecked(False)
 
-    def onButton_DiscTitle_ChapterRange_Reset(self):
-        """ Reset the chapter ranges for the selected title.
-        """
-        title = self.activeTitle()
-        if (title is None):
-            return
-
-        self.spinBox_DiscTitle_ChapterRange_First.setValue(title.chapters.lowestChapterNumber)
-        self.spinBox_DiscTitle_ChapterRange_Last.setValue(title.chapters.highestChapterNumber)
-
-        self.statusBar.showMessage('Chapter ranges reset.', 15000)
+        self.statusBar.showMessage('Title selections cleared.', 15000)
 
     def onButton_DiscTitle_CopyEpisode(self):
         """ Copy a chapter episode.
@@ -919,7 +1304,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         title.customCrop.clear()
         self.__DiscTitle_CropStatesToWidgets(title)
-        self.onDiscTitle_EnableCropWidgets()
+        self.onDiscTitle_Cropping_EnableWidgets()
 
         self.statusBar.showMessage('Title cropping states cleared.', 15000)
 
@@ -933,7 +1318,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         title.customCrop.Copy(title.autoCrop)
         title.customCrop.processChoice = title.customCrop.PROCESS_CUSTOM
         self.__DiscTitle_CropStatesToWidgets(title)
-        self.onDiscTitle_EnableCropWidgets()
+        self.onDiscTitle_Cropping_EnableWidgets()
 
         self.statusBar.showMessage('Title cropping states found and set.', 15000)
 
@@ -955,7 +1340,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         # If row count was zero enable the range copy/delete buttons.
         if (not self.tableWidget_DiscTitle_Episodes.rowCount()):
-            self.onDiscTitle_EnableChapterRangeWidgets()
+            self.onDiscTitle_ChapterRanges_EnableWidgets()
 
         self.statusBar.showMessage('1 episode deleted.', 15000)
 
@@ -975,9 +1360,96 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         title.chapterRanges.clearEpisodes()
         self.tableWidget_DiscTitle_Episodes.setRowCount(0)
-        self.onDiscTitle_EnableChapterRangeWidgets()
+        self.onDiscTitle_ChapterRanges_EnableWidgets()
 
         self.statusBar.showMessage('{} episodes deleted.'.format(rowCount), 15000)
+
+    def onButton_DiscTitle_MoveBottom(self):
+        """ Move the selected title to the top of the list.
+        """
+        # We don't need to worry about the "visible row" problem because the
+        # row we're moving is visible and it's below all the other rows.
+
+        self.__titleSelection_widgetDataConnectors.transferFromWidgets()
+        self.__TitleDetailsFromWidgets()
+
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        self.disc.titles.MoveBottom(title)
+        self.__TransferToDiscTables()
+        self.tableWidget_Disc_Titles.setCurrentItem(self.tableWidget_Disc_Titles.item(self.tableWidget_Disc_Titles.rowCount() - 1, 0))
+
+        self.onDisc_Titles_EnableWidgets()
+
+    def onButton_DiscTitle_MoveDown(self):
+        """ Move the selected title down one entry in the list.
+        """
+        self.__titleSelection_widgetDataConnectors.transferFromWidgets()
+        self.__TitleDetailsFromWidgets()
+
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        self.disc.titles.MoveDown(title)
+        self.__TransferToDiscTables()
+
+        idx = self.getTitleRow(title)
+        self.tableWidget_Disc_Titles.setCurrentItem(self.tableWidget_Disc_Titles.item(idx, 0))
+
+        self.onDisc_Titles_EnableWidgets()
+
+    def onButton_DiscTitle_MoveTop(self):
+        """ Move the selected title to the top of the list.
+        """
+        # We don't need to worry about the "visible row" problem because the
+        # row we're moving is visible and it's above all the other rows.
+
+        self.__titleSelection_widgetDataConnectors.transferFromWidgets()
+        self.__TitleDetailsFromWidgets()
+
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        self.disc.titles.MoveTop(title)
+        self.__TransferToDiscTables()
+        self.tableWidget_Disc_Titles.setCurrentItem(self.tableWidget_Disc_Titles.item(0, 0))
+
+        self.onDisc_Titles_EnableWidgets()
+
+    def onButton_DiscTitle_MoveUp(self):
+        """ Move the selected title up one entry in the list.
+        """
+        self.__titleSelection_widgetDataConnectors.transferFromWidgets()
+        self.__TitleDetailsFromWidgets()
+
+        title = self.activeTitle()
+        if (title is None):
+            return
+
+        self.disc.titles.MoveUp(title)
+        self.__TransferToDiscTables()
+
+        idx = self.getTitleRow(title)
+        self.tableWidget_Disc_Titles.setCurrentItem(self.tableWidget_Disc_Titles.item(idx, 0))
+
+        self.onDisc_Titles_EnableWidgets()
+
+    def onButton_DiscTitle_RestoreNaturalOrder(self):
+        """ Restore the natural order of the title list.
+        """
+        self.__titleSelection_widgetDataConnectors.transferFromWidgets()
+        self.__TitleDetailsFromWidgets()
+
+        self.disc.titles.SetNaturalTitleOrder()
+        self.__TransferToDiscTables()
+
+        self.tableWidget_Disc_Titles.setCurrentItem(self.tableWidget_Disc_Titles.item(0, 0))
+
+        self.onDisc_Titles_EnableWidgets()
 
     def onButton_DiscTitle_SubtitleTracks_Clear(self):
         """ Clear the current subtitle track settings for the active title.
@@ -988,7 +1460,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         title.subtitleTrackStates.clear()
         self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
-        self.onDiscTitle_EnableSubtitleTracksWidgets()
+        self.onDiscTitle_SubtitleTracks_EnableWidgets()
 
         self.statusBar.showMessage('Title subtitle track states cleared.', 15000)
 
@@ -1004,7 +1476,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         title.subtitleTrackStates.processChoice = title.subtitleTrackStates.PROCESS_CUSTOM
 
         self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
-        self.onDiscTitle_EnableSubtitleTracksWidgets()
+        self.onDiscTitle_SubtitleTracks_EnableWidgets()
 
         self.statusBar.showMessage('Title subtitle track states found and set.', 15000)
 
@@ -1032,318 +1504,130 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.__discTitle_cropWidgets.setWidgetsFromCrop(title.customCrop)
 
-    def onDiscTitle_EnableAudioTracksWidgets(self, bool=False):
+    def __DiscTitle_ShowTabIcon(self, idx, hideIcon):
+        """ Set/clear the icon for a disc title details tab.
+        """
+        if (hideIcon):
+            self.tabWidget_DiscTitle.setTabIcon(idx, self.__tabIcon_Clear)
+        else:
+            self.tabWidget_DiscTitle.setTabIcon(idx, self.__tabIcon_Highlight)
+
+    def onDisc_Titles_EnableWidgets(self):
+        """ Enable/disable widgets associated with the disc titles list.
+
+            Right now, this is the up/down title re-ordering buttons.
+        """
+        if (not self.disc.titles.HasTitles()):
+            frame_DiscTitle_List.setEnabled(False)
+            return
+        self.frame_DiscTitle_List.setEnabled(True)
+
+        visible = self.Disc_Titles_GetVerticalHeadersVisible()
+        upOk = (visible.currentRowVisualIndex > visible.firstVisualIndex)
+        downOk = (visible.currentRowVisualIndex < visible.lastVisualIndex)
+
+        self.toolButton_DiscTitle_MoveTop.setEnabled(upOk)
+        self.toolButton_DiscTitle_MoveUp.setEnabled(upOk)
+        self.toolButton_DiscTitle_MoveDown.setEnabled(downOk)
+        self.toolButton_DiscTitle_MoveBottom.setEnabled(downOk)
+
+    def onDiscTitle_AudioTracks_EnableWidgets(self, bool=False):                # revised
         """ Enable/disable the widgets associated with custom audio track mixdowns.
         """
         title = self.activeTitle(False)
-        enableButtons = False
-        enableBoxes = False
+        if (title is None):
+            self.tab_DiscTitle_AudioTracks.setEnabled(False)
+            return
 
-        if (title is not None):
-            if (len(title.audioTracks)):
-                enableButtons = True
+        if (len(title.audioTracks) == 0):
+            self.tab_DiscTitle_AudioTracks.setEnabled(False)
+            return
 
-        if (enableButtons and self.radioButton_DiscTitle_AudioTracks_Custom.isChecked()):
-            enableBoxes = True
+        self.__discTitle_audioTrackWidgets.setEnabled(self.radioButton_DiscTitle_AudioTracks_Custom.isChecked())
+        self.__discTitle_audioTrackWidgets.enableMixdowns()
 
-        self.radioButton_DiscTitle_AudioTracks_Default.setEnabled(enableButtons)
-        self.radioButton_DiscTitle_AudioTracks_Custom.setEnabled(enableButtons)
-        self.toolButton_DiscTitle_AudioTracks_Clear.setEnabled(enableButtons)
-        self.toolButton_DiscTitle_AudioTracks_Find.setEnabled(enableButtons)
+        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_AUDIO_TRACKS,
+            self.radioButton_DiscTitle_AudioTracks_Default.isChecked())
 
-        self.__discTitle_audioTrackWidgets.setEnabled(enableBoxes)
-
-        if (self.radioButton_DiscTitle_AudioTracks_Default.isChecked()):
-            self.tabWidget_Disc.setTabIcon(3, QIcon())
-        else:
-            self.tabWidget_Disc.setTabIcon(3, self.highlightedTabIcon)
-
-    def onDiscTitle_EnableChapterRangeWidgets(self, bool=False):
+    def onDiscTitle_ChapterRanges_EnableWidgets(self, bool=False):              # revised
         """ Enable/disable the Set Title End button.  It's only enabled if
             the Include Names button is checked and the title has chapters.
         """
         rowCount = self.tableWidget_Disc_Chapters.rowCount()
 
-        self.radioButton_DiscTitle_AllChapters.setEnabled(rowCount)
-        self.radioButton_DiscTitle_ChapterRange.setEnabled(rowCount)
-        self.radioButton_DiscTitle_Episodes.setEnabled(rowCount)
+        self.tab_DiscTitle_ChapterRanges.setEnabled(rowCount)
+        if (rowCount):
+            enableRangeWidgets = self.radioButton_DiscTitle_ChapterRange.isChecked()
+            self.spinBox_DiscTitle_ChapterRange_First.setEnabled(enableRangeWidgets)
+            self.spinBox_DiscTitle_ChapterRange_Last.setEnabled(enableRangeWidgets)
+            self.toolButton_DiscTitle_ChapterRange_Reset.setEnabled(enableRangeWidgets)
 
-        self.spinBox_DiscTitle_ChapterRange_First.setEnabled(self.radioButton_DiscTitle_ChapterRange.isChecked())
-        self.spinBox_DiscTitle_ChapterRange_Last.setEnabled(self.radioButton_DiscTitle_ChapterRange.isChecked())
-        self.toolButton_DiscTitle_ChapterRange_Reset.setEnabled(self.radioButton_DiscTitle_ChapterRange.isChecked())
+            enableEpisodesWidgets = self.radioButton_DiscTitle_Episodes.isChecked()
+            self.tableWidget_DiscTitle_Episodes.setEnabled(enableEpisodesWidgets)
+            self.toolButton_DiscTitle_AddEpisode.setEnabled(enableEpisodesWidgets)
 
-        self.tableWidget_DiscTitle_Episodes.setEnabled(self.radioButton_DiscTitle_Episodes.isChecked())
-        self.toolButton_DiscTitle_AddEpisode.setEnabled(self.radioButton_DiscTitle_Episodes.isChecked())
-        self.toolButton_DiscTitle_CopyEpisode.setEnabled(self.radioButton_DiscTitle_Episodes.isChecked()
-            and self.tableWidget_DiscTitle_Episodes.rowCount() > 0)
-        self.toolButton_DiscTitle_DeleteEpisode.setEnabled(self.radioButton_DiscTitle_Episodes.isChecked()
-            and self.tableWidget_DiscTitle_Episodes.rowCount() > 0)
-        self.toolButton_DiscTitle_Episodes_DeleteAll.setEnabled(self.radioButton_DiscTitle_Episodes.isChecked()
-            and self.tableWidget_DiscTitle_Episodes.rowCount() > 0)
+            enableEpisodesWidgets2 = (enableRangeWidgets
+                and self.tableWidget_DiscTitle_Episodes.rowCount() > 0)
+            self.toolButton_DiscTitle_CopyEpisode.setEnabled(enableEpisodesWidgets2)
+            self.toolButton_DiscTitle_DeleteEpisode.setEnabled(enableEpisodesWidgets2)
+            self.toolButton_DiscTitle_Episodes_DeleteAll.setEnabled(enableEpisodesWidgets2)
 
-        if (self.radioButton_DiscTitle_AllChapters.isChecked()):
-            self.tabWidget_Disc.setTabIcon(2, QIcon())
-        else:
-            self.tabWidget_Disc.setTabIcon(2, self.highlightedTabIcon)
+        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_CHAPTER_RANGES,
+            self.radioButton_DiscTitle_AllChapters.isChecked())
 
-    def onDiscTitle_EnbableChapterWidgets(self, bool=False):
+    def onDiscTitle_Chapters_EnableWidgets(self, bool=False):                   # revised
         """ Enable/disable the widgets associated with chapter editing.
         """
         rowCount = self.tableWidget_Disc_Chapters.rowCount()
 
-        self.radioButton_Disc_Chapters_NoMarkers.setEnabled(rowCount)
-        self.radioButton_Disc_Chapters_IncludeMarkers.setEnabled(rowCount)
-        self.radioButton_Disc_Chapters_IncludeNames.setEnabled(rowCount)
+        self.tab_DiscTitle_Chapters.setEnabled(rowCount)
+        if (rowCount):
+            enableWidgets = self.radioButton_DiscTitle_Chapters_IncludeNames.isChecked()
 
-        self.spinBox_Disc_Chapters_FirstChapter.setEnabled(rowCount)
-        self.toolButton_Disc_Chapters_ResetFirstChapter.setEnabled(rowCount)
+            self.pushButton_DiscTitle_Chapters_ExportNames.setEnabled(enableWidgets)
+            self.pushButton_DiscTitle_Chapters_ResetNames.setEnabled(enableWidgets)
+            self.pushButton_DiscTitle_Chapters_SetTitleEnd.setEnabled(enableWidgets)
 
-        enableWidgets = (rowCount
-            and self.radioButton_Disc_Chapters_IncludeNames.isChecked())
+            self.tableWidget_Disc_Chapters.setEnabled(enableWidgets)
 
-        self.pushButton_Disc_Chapters_ImportChapterNames.setEnabled(self.tableWidget_Disc_Chapters.rowCount())
+        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_CHAPTERS,
+            self.radioButton_DiscTitle_Chapters_IncludeMarkers.isChecked())
 
-        self.pushButton_Disc_Chapters_ExportChapterNames.setEnabled(enableWidgets)
-        self.pushButton_Disc_Chapters_ResetNames.setEnabled(enableWidgets)
-        self.pushButton_Disc_Chapters_SetTitleEnd.setEnabled(enableWidgets)
-
-        self.tableWidget_Disc_Chapters.setEnabled(enableWidgets)
-
-        if (self.radioButton_Disc_Chapters_IncludeMarkers.isChecked()):
-            self.tabWidget_Disc.setTabIcon(1, QIcon())
-        else:
-            self.tabWidget_Disc.setTabIcon(1, self.highlightedTabIcon)
-
-    def onDiscTitle_EnableCropWidgets(self, bool=False):
+    def onDiscTitle_Cropping_EnableWidgets(self, bool=False):                   # revised
         """ Enable/disable the widgets associated with custom cropping.
         """
         title = self.activeTitle(False)
-        enableButtons = False
-        enableBoxes = False
+        if (title is None):
+            self.tab_DiscTitle_Croping.setEnabled(False)
+            return
 
-        if (title is not None):
-            enableButtons = True
+        self.__discTitle_cropWidgets.setEnabled(self.radioButton_DiscTitle_Crop_Custom.isChecked())
 
-        if (enableButtons and self.radioButton_DiscTitle_Crop_Custom.isChecked()):
-            enableBoxes = True
+        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_CROPPING,
+            self.radioButton_DiscTitle_Crop_Default.isChecked())
 
-        self.radioButton_DiscTitle_Crop_Default.setEnabled(enableButtons)
-        self.radioButton_DiscTitle_Crop_Automatic.setEnabled(enableButtons)
-        self.radioButton_DiscTitle_Crop_Custom.setEnabled(enableButtons)
-        self.toolButton_DiscTitle_Crop_Clear.setEnabled(enableButtons)
-        self.toolButton_DiscTitle_Crop_Find.setEnabled(enableButtons)
-
-        self.__discTitle_cropWidgets.setEnabled(enableBoxes)
-
-        if (self.radioButton_DiscTitle_Crop_Default.isChecked()):
-            self.tabWidget_Disc.setTabIcon(5, QIcon())
-        else:
-            self.tabWidget_Disc.setTabIcon(5, self.highlightedTabIcon)
-
-    def onDiscTitle_EnableSubtitleTracksWidgets(self, bool=False):
+    def onDiscTitle_SubtitleTracks_EnableWidgets(self, bool=False):             # revised
         """ Enable/disable the widgets associated with custom subtitle track mixdowns.
         """
         title = self.activeTitle(False)
-        enableButtons = False
-        enableBoxes = False
+        if (title is None):
+            self.tab_DiscTitle_SubtitleTracks.setEnabled(False)
+            return
 
-        if (title is not None):
-            if (len(title.subtitleTracks)):
-                enableButtons = True
+        if (len(title.subtitleTracks) == 0):
+            self.tab_DiscTitle_SubtitleTracks.setEnabled(False)
+            return
 
-        if (enableButtons and self.radioButton_DiscTitle_SubtitleTracks_Custom.isChecked()):
-            enableBoxes = True
+        self.__discTitle_subtitleTrackWidgets.setEnabled(self.radioButton_DiscTitle_SubtitleTracks_Custom.isChecked())
+        self.__discTitle_subtitleTrackWidgets.enableCheckBoxes()
 
-        self.radioButton_DiscTitle_SubtitleTracks_Default.setEnabled(enableButtons)
-        self.radioButton_DiscTitle_SubtitleTracks_Custom.setEnabled(enableButtons)
-        self.toolButton_DiscTitle_SubtitleTracks_Clear.setEnabled(enableButtons)
-        self.toolButton_DiscTitle_SubtitleTracks_Find.setEnabled(enableButtons)
-
-        self.__discTitle_subtitleTrackWidgets.setEnabled(enableBoxes)
-
-        if (self.radioButton_DiscTitle_SubtitleTracks_Default.isChecked()):
-            self.tabWidget_Disc.setTabIcon(4, QIcon())
-        else:
-            self.tabWidget_Disc.setTabIcon(4, self.highlightedTabIcon)
+        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_SUBTITLES,
+            self.radioButton_DiscTitle_SubtitleTracks_Default.isChecked())
 
     # TODO add status bar messages for lots of actions
-
-    def onDisc_Chapters_ResetFirstChapter(self):
-        """ Reset the first chapter number.
-        """
-        self.spinBox_Disc_Chapters_FirstChapter.setValue(1)
-
-        self.statusBar.showMessage('First chapter number reset to 1.', 15000)
-
-    # TODO refactor method names, especially buttons | onDisc_Chapters_ResetNames becomes onButton_Disc_Chapters_ResetNames
+    # TODO data connectors for title detail widgets
+    # TODO refactor method names, especially buttons | onButton_DiscTitle_Chapters_ResetNames becomes onButton_Disc_Chapters_ResetNames
     # TODO onSignal, etc.
-
-    def onDisc_Chapters_ResetNames(self):
-        """ Reset the chapter names to their default values.
-        """
-        for idx in range(self.tableWidget_Disc_Chapters.rowCount()):
-            chapter = self.tableWidget_Disc_Chapters.item(idx, 0).data(Qt.UserRole)
-            self.tableWidget_Disc_Chapters.item(idx, 3).setData(Qt.EditRole, chapter.defaultName)
-
-        self.statusBar.showMessage('Chapter names reset.', 15000)
-
-    def onDisc_Chapters_SetTitleEnd(self):
-        """ Set the last chapter name to the preferences short title if it is a
-            short title.
-        """
-        idx = self.tableWidget_Disc_Chapters.rowCount() - 1
-        chapter = self.tableWidget_Disc_Chapters.item(idx, 0).data(Qt.UserRole)
-
-        if (not chapter.isShortChapter):
-            result = QMessageBox.question(self, 'Set Short Chapter',
-                'Chapter () is not a short chapter.  Do you want to continue?'.format(chapter.chapterNumber))
-            if (result != QMessageBox.Yes):
-                return
-
-        if (self.tableWidget_Disc_Chapters.item(idx, 3).text() != chapter.defaultName):
-            result = QMessageBox.question(self, 'Set Short Chapter',
-                'The name for chapter {} is not the default name.  Do you want to continue?'.format(chapter.chapterNumber))
-            if (result != QMessageBox.Yes):
-                return
-
-        self.tableWidget_Disc_Chapters.item(idx, 3).setData(Qt.EditRole, self.preferences.options.textImportShortChapter)
-
-        self.statusBar.showMessage('The name for chapter {} was set to {}.'.format(chapter.chapterNumber,
-            self.preferences.options.textImportShortChapter), 15000)
-
-    def onAction_Disc_Destination_Browse(self):
-        """ Select a folder where the transcoded video files will be saved.
-        """
-        destinationFolder = QFileDialog.getExistingDirectory(self,
-            'Select Destination Folder', self.lineEdit_Disc_Destination.text())
-        if (not destinationFolder):
-            return
-
-        self.lineEdit_Disc_Destination.setText(destinationFolder)
-        self.Validator_Disc_Destination.clearHighlight()
-
-    def onDisc_Find_AudioTracks(self):
-        """ Find the audio track and mixdown settings for the first visible,
-            selected title.  Then set the disc audio track states and update the
-            widgets.
-
-            Use the default title is nothing matches.
-        """
-        matchingTitles = self.disc.titles.GetMatchingTitles(Titles.FLAG_SELECTED
-            | Titles.FLAG_VISIBLE)
-
-        if (len(matchingTitles.matchingTitles)):
-            matchingTitle = matchingTitles.matchingTitles[0]
-        else:
-            matchingTitle = matchingTitles.defaultTitle
-
-        self.disc.audioTrackStates.AutoSet_From_AudioTracks(
-            matchingTitle.audioTracks,
-            self.preferences)
-
-        self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_AUDIO)
-        self.statusBar.showMessage('Audio track selections updated.', 15000)
-
-    def onDisc_Find_Crop(self):
-        """ Find the cropping values for the first selected title. Then set the
-            disc cropping values and update the widgets.
-
-            Use the default title is nothing matches.
-        """
-        matchingTitles = self.disc.titles.GetMatchingTitles(Titles.FLAG_SELECTED
-            | Titles.FLAG_VISIBLE)
-
-        if (len(matchingTitles.matchingTitles)):
-            matchingTitle = matchingTitles.matchingTitles[0]
-        else:
-            matchingTitle = matchingTitles.defaultTitle
-
-        self.disc.customCrop.Copy(matchingTitle.autoCrop)
-        self.disc.customCrop.processChoice = self.disc.customCrop.PROCESS_AUTOMATIC
-
-        self.TransferToWindow(self.WIDGET_GROUP_DISC_CROP)
-        self.statusBar.showMessage('Cropping selections updated.', 15000)
-
-    def onDisc_Find_SubtitleTracks(self):
-        """ Find the Subtitle track for the first selected title. Then set the
-            disc subtitle track states and update the widgets.
-
-            Use the default title is nothing matches.
-        """
-        matchingTitles = self.disc.titles.GetMatchingTitles(Titles.FLAG_SELECTED
-            | Titles.FLAG_VISIBLE)
-
-        if (len(matchingTitles.matchingTitles)):
-            matchingTitle = matchingTitles.matchingTitles[0]
-        else:
-            matchingTitle = matchingTitles.defaultTitle
-
-        self.disc.subtitleTrackStates.AutoSet_From_SubtitleTracks(
-            matchingTitle.subtitleTracks,
-            self.preferences)
-
-        self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_SUBTITLE)
-        self.statusBar.showMessage('Subtitle track selections updated.', 15000)
-
-
-        # TODO subtitle tracks validators - if burn, focus or default checked then corresponding combobox must have a track selected.
-
-    def onDisc_Reset_EpisodeNumberPrecision(self):
-        """ Reset the first episode number precision to it's default value.
-        """
-        self.spinBox_Disc_EpisodeNumberPrecision.setValue(self.disc.DEFAULT_EPISODE_NUMBER_PRECISION)
-
-    def onDisc_Reset_FirstEpisode(self):
-        """ Reset the first episode number to it's default value.
-        """
-        self.spinBox_Disc_FirstEpisode.setValue(self.disc.DEFAULT_FIRST_EPISODE_NUMBER)
-
-    def onAction_Disc_Source_Browse(self):
-        """ Find a video folder with containing a copy of a DVD or BluRay disc
-            and read the disc with Handbrake.  Then parse the disc information.
-        """
-        sourceFolder = QFileDialog.getExistingDirectory(self,
-            'Select Video Folder', self.lineEdit_Disc_Source.text())
-        if (not sourceFolder):
-            return
-
-        self.lineEdit_Disc_Source.setText(sourceFolder)
-        self.lineEdit_Disc_Source.setStyleSheet('')
-        self.disc.source = sourceFolder
-
-        if (not self.__ReadSource()):
-            return
-
-        self.__onNewSource()
-
-        self.TransferToWindow()
-
-    def onDisc_Source_Find(self):
-        """ Find a video folder with containing a copy of a DVD or BluRay disc.
-            DO NOT read the disc with Handbrake.  DO NOT parse the disc information.
-        """
-        sourceFolder = QFileDialog.getExistingDirectory(self,
-            'Find Video Folder', self.lineEdit_Disc_Source.text())
-        if (not sourceFolder):
-            return
-
-        self.lineEdit_Disc_Source.setText(sourceFolder)
-        self.lineEdit_Disc_Source.setStyleSheet('')
-        self.disc.source = sourceFolder
-
-    def onDisc_Source_Read(self):
-        """ Re-read the disc with Handbrake.  Then parse the disc information.
-        """
-
-        if (not self.Validator_Disc_Source.isValid()):
-            return
-
-        if (not self.__ReadSource()):
-            return
-
-        # TODO default destination was not set.
-
-        self.TransferToWindow()
 
     # def onDiscTitle_AllChapters(self, enabled):
     #     """ Enable/disable the chapter range controls in response to the all
@@ -1354,20 +1638,21 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
 
 
-    def onDisc_Titles_CurrentItemChanged(self, currentItem, previousItem):
-        """ Triggered when a new title is selected.
-        """
-
-        print (currentItem, previousItem)
-        if (currentItem):
-            print ('current', currentItem.row())
-        if (previousItem):
-            print ('previous', previousItem.row())
+    # def onDisc_Titles_CurrentItemChanged(self, currentItem, previousItem):
+    #     """ Triggered when a new title is selected.
+    #     """
+    #
+    #     print (currentItem, previousItem)
+    #     if (currentItem):
+    #         print ('current', currentItem.row())
+    #     if (previousItem):
+    #         print ('previous', previousItem.row())
 
     def onDisc_Titles_ItemSelectionChanged(self):
         """ Triggered when a new title is selected.
         """
         self.__TitleDetailsFromWidgets()
+        self.onDisc_Titles_EnableWidgets()
 
         currentItem = self.tableWidget_Disc_Titles.currentItem()
         if (currentItem is None):       # This will be None if we're here because the selected row was deleted.
@@ -1375,6 +1660,29 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         title = self.tableWidget_Disc_Titles.item(currentItem.row(), 0).data(Qt.UserRole)
         self.__TitleDetailsToWidgets(title)
+
+    def Disc_Titles_GetVerticalHeadersVisible(self):
+        """ Returns a named tupple:
+                Visual index of first visible row
+                Visual index of last visible row
+                Visual index of current row
+        """
+        firstVisibleIndex = sys.maxsize
+        lastVisibleIndex = -1
+
+        for idx in range(self.tableWidget_Disc_Titles.verticalHeader().count()):
+            if (self.tableWidget_Disc_Titles.verticalHeader().isSectionHidden(idx)):
+                continue
+
+            visualIndex = self.tableWidget_Disc_Titles.verticalHeader().visualIndex(idx)
+
+            firstVisibleIndex = min(firstVisibleIndex, visualIndex)
+            lastVisibleIndex = max(lastVisibleIndex, visualIndex)
+
+        row = self.tableWidget_Disc_Titles.currentRow()
+        currentRowVisualIndex = self.tableWidget_Disc_Titles.verticalHeader().visualIndex(row)
+
+        return VerticalHeadersVisible(firstVisibleIndex, lastVisibleIndex, currentRowVisualIndex)
 
     def __StandardTableWidgetInitialization(self, tableWidget, horizontalHeaderLabels=None):
         """ Standard initialization for a QTableWidget.
@@ -1438,11 +1746,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # Update the chapters widgets.
         # ======================================================================
         if (title.chapters.processChoice == title.chapters.PROCESS_MARKERS):
-            self.radioButton_Disc_Chapters_IncludeMarkers.setChecked(True)
+            self.radioButton_DiscTitle_Chapters_IncludeMarkers.setChecked(True)
         elif (title.chapters.processChoice == title.chapters.PROCESS_NAMES):
-            self.radioButton_Disc_Chapters_IncludeNames.setChecked(True)
+            self.radioButton_DiscTitle_Chapters_IncludeNames.setChecked(True)
         else:
-            self.radioButton_Disc_Chapters_NoMarkers.setChecked(True)
+            self.radioButton_DiscTitle_Chapters_NoMarkers.setChecked(True)
 
         self.spinBox_Disc_Chapters_FirstChapter.setValue(title.chapters.firstChapterNumber)
 
@@ -1462,7 +1770,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.tableWidget_Disc_Chapters.resizeColumnsToContents()
 
-        self.onDiscTitle_EnbableChapterWidgets()
+        self.onDiscTitle_Chapters_EnableWidgets()
 
         # Update the chapter ranges widgets.
         # ======================================================================
@@ -1508,7 +1816,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             idx += 1
 
         self.tableWidget_DiscTitle_Episodes.resizeColumnsToContents()
-        self.onDiscTitle_EnableChapterRangeWidgets()
+        self.onDiscTitle_ChapterRanges_EnableWidgets()
 
         # Update the title audio state widgets.
         # ======================================================================
@@ -1518,7 +1826,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         #     self.radioButton_DiscTitle_AudioTracks_Custom.setChecked(True)       # PROCESS_ALL
 
         self.__DiscTitle_AudioTrackStatesToWidgets(title)
-        self.onDiscTitle_EnableAudioTracksWidgets()
+        self.onDiscTitle_AudioTracks_EnableWidgets()
 
         # Update the title subtitle state widgets.
         # ======================================================================
@@ -1528,7 +1836,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         #     self.radioButton_DiscTitle_SubtitleTracks_Custom.setChecked(True)       # PROCESS_ALL
 
         self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
-        self.onDiscTitle_EnableSubtitleTracksWidgets()
+        self.onDiscTitle_SubtitleTracks_EnableWidgets()
 
         # Update the title crop state widgets.
         # ======================================================================
@@ -1540,7 +1848,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         #     self.radioButton_DiscTitle_Crop_Custom.setChecked(True)       # PROCESS_ALL
 
         self.__DiscTitle_CropStatesToWidgets(title)
-        self.onDiscTitle_EnableCropWidgets()
+        self.onDiscTitle_Cropping_EnableWidgets()
 
     def __TitleDetailsFromWidgets(self):
         """ Update the title details from the title detail widgets.
@@ -1553,11 +1861,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         # Update the title chapters table.
         # ======================================================================
-        if self.radioButton_Disc_Chapters_IncludeMarkers.isChecked():
+        if self.radioButton_DiscTitle_Chapters_IncludeMarkers.isChecked():
             title.chapters.processChoice = title.chapters.PROCESS_MARKERS
-        if self.radioButton_Disc_Chapters_IncludeNames.isChecked():
+        if self.radioButton_DiscTitle_Chapters_IncludeNames.isChecked():
             title.chapters.processChoice = title.chapters.PROCESS_NAMES
-        if self.radioButton_Disc_Chapters_NoMarkers.isChecked():
+        if self.radioButton_DiscTitle_Chapters_NoMarkers.isChecked():
             title.chapters.processChoice = title.chapters.PROCESS_NONE
 
         title.chapters.firstChapterNumber = self.spinBox_Disc_Chapters_FirstChapter.value()
@@ -1618,59 +1926,13 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.__discTitle_cropWidgets.setCropFromWidgets(title.customCrop)
 
-    def onAction_EditPreferences(self):
-        """Edit the application preferences."""
-
-        dlg = PreferencesDialog(self.preferences, self)
-        dlg.TransferToWindow()
-        result = dlg.exec_()
-        if (result):
-            dlg.TransferFromWindow()
-            QApplication.instance().SavePreferences()
-            QApplication.instance().preferences.logging.InitLog()
-
-            self.Load_Disc_FilenameTemplates()
-            self.Load_Disc_Presets()
-            self.Load_Disc_Mixdowns()
-            self.Load_DiscTitle_Mixdowns()
-
-            DiscFilenameTemplatesSingleton().Set(self.preferences.filenameTemplates)
-            DiscPresetsSingleton().Set(self.preferences.presets.GetNames())
-            TitleVisibleSingleton().minimumTitleSeconds = self.preferences.autoTitle.minimumTitleSeconds
-
-            log = SingletonLog()
-            log.writeline('Preferences updated')
-
-            # TODO status bar message x2
-
-    def onEditSourceDiskLabel(self):
-        """ Get the disk label from the user.
-        """
-
-        text, ok  = QInputDialog.getText(self, 'Set Disk Volume Label', 'Volume label',
-            text = self.lineEdit_Disc_DiskLabel.text())
-
-        if (ok):
-            self.lineEdit_Disc_DiskLabel.setText(text)
-            self.Validator_Disc_DiskLabel.clearHighlight()
-
-    def onGetSourceDiskLabel(self):
-        """ Get the volume label for the disk where the source is located.
-
-            Only Windows disks have volume labels.
-        """
-
-        if (sys.platform == 'win32'):
-            volumeLabel = GetVolumeLabel(lineEdit_Disc_Source.text())
-            self.lineEdit_Disc_DiskLabel.setText(volumeLabel)
-
     def __onNewSource(self):
         """ Stuff to do after a new source is parsed.
         """
 
         # Disc stuff
         # ======================================================================
-        self.onGetSourceDiskLabel()
+        self.onButton_Disc_SourceDiskLabel_Get()
 
         if (not self.lineEdit_Disc_Destination.text()):
             if (self.preferences.newSource.useDefaultDestination):
@@ -1712,30 +1974,15 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
 
 
-
-    def onSaveHashSession(self):
-        """ Create an xml file using the disc hash.  The file will contain the disc
-            information and the disc state data.
-        """
-        self.__SaveSession(QApplication.instance().hashSessionFilename)
+        self.Enable_Disc()
+        self.__disc_audioTrackWidgets.enableMixdowns()
+        self.__disc_subtitleTrackWidgets.enableCheckBoxes()
 
     # TODO create class for cells and size information (separate classes)
     # TODO base cells, size, crop classes on list, set?
-
-    def onButton_VLC(self):
-        """ Start VLC using the source path.
-        """
-
-        if (not self.Validator_Disc_Source.isValid()):
-            return
-
-        # process = QProcess(QApplication.instance())
-        started = QProcess.startDetached('"{}" "{}"'.format(self.preferences.executables.VLC, self.lineEdit_Disc_Source.text()))
-
-        if (not started):
-            QMessageBox.critical(self, 'Run Error',
-                'An error has occurred while running VLC.\nVLC did not start.')
-            return False
+    # TODO recent file list
+    # TODO auto save sessions
+    # TODO save to temporary
 
     def __ReadSource(self):
         """ Read the disc with Handbrake from the source with HandBrake, then
@@ -1773,7 +2020,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 return False
 
             # Don't know why but HandBrake returns the results on StandardError not StandardOutput (linux)
-            self.disc.Parse(bytearray(process.readAllStandardError()).decode('utf-8'))
+            self.disc.Parse(bytearray(process.readAllStandardError()).decode('ISO-8859-1'))
+            # self.disc.Parse(bytearray(process.readAllStandardError()).decode('utf-8'))
 
             self.statusBar.showMessage('Source folder "{}" was read.'.format(self.lineEdit_Disc_Source.text()), 15000)
             return True
@@ -1826,6 +2074,23 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         # self.SaveFileHistory()
 
+    def onSignal_toggled_Disc_HideShortTitles(self, checked):
+        """ Show/hide short titles.
+        """
+        TitleVisibleSingleton().hideShortTitles = checked
+        self.disc.titles.RefreshVisible()
+
+        firstVisibleRow = None
+        for idx in range(self.tableWidget_Disc_Titles.rowCount()):
+            title = self.tableWidget_Disc_Titles.item(idx, 0).data(Qt.UserRole)
+            self.tableWidget_Disc_Titles.setRowHidden(idx, not title.visible)
+
+            if (firstVisibleRow is None and title.visible):
+                firstVisibleRow = idx
+                self.tableWidget_Disc_Titles.setCurrentCell(idx, 1)
+
+        self.onDisc_Titles_EnableWidgets()
+
     def TransferFromWindow(self, groupFlags=0):
         """ Copy the data from the preferences object to the dialog widgets.
         """
@@ -1833,7 +2098,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.__widgetDataConnectors.transferFromWidgets(groupFlags)
 
     def __TransferToDiscTables(self):
-        """ Copy the data from the preferences object to the dialog widgets.
+        """ Copy the data from the disc titles to the disc titles table widget.
         """
 
         # Transfer the disc titles to the disc titles table.
@@ -1844,6 +2109,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # TODO transfer by order number
         titleKeys = sorted(self.disc.titles.titlesByOrderNumber.keys())
         idx = 0
+        self.__titleSelection_widgetDataConnectors.clear()
         for key in titleKeys:
             title = self.disc.titles.titlesByOrderNumber[key]
 
@@ -1852,12 +2118,16 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
             widget = QWidget()
             checkBox = QCheckBox()
-            checkBox.setCheckState(BoolToQtChecked(title.selected))
+            checkBox.setObjectName('checkBox_DiscTitle_SelectTitle')
+            checkBox.setChecked(title.selected)
             layout = QHBoxLayout(widget)
             layout.addWidget(checkBox, alignment=Qt.AlignCenter)
             layout.setContentsMargins(0,0,0,0);
             widget.setLayout(layout)
             self.tableWidget_Disc_Titles.setCellWidget(idx, 0, widget)
+
+            self.__titleSelection_widgetDataConnectors.append(QCheckBoxDataConnector(
+                checkBox, title, 'selected', 0))
 
             # Add an item behind the checkbox.  It's need to generate item change signals.
             AddItemToTableWidgetCell(self.tableWidget_Disc_Titles, idx, 0,
@@ -1868,8 +2138,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 title.duration, readOnly=True)
             AddItemToTableWidgetCell(self.tableWidget_Disc_Titles, idx, 3,
                 title.displayAspectRatio, readOnly=True)
-            AddItemToTableWidgetCell(self.tableWidget_Disc_Titles, idx, 4,
+
+            item = AddItemToTableWidgetCell(self.tableWidget_Disc_Titles, idx, 4,
                 title.title, textAlignment=None)
+            self.__titleSelection_widgetDataConnectors.append(QTableWidgetItemDataConnector(
+                item, title, 'title', 0))
 
             self.tableWidget_Disc_Titles.setRowHidden(idx, not title.visible)
 
@@ -1886,7 +2159,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.__widgetDataConnectors.transferToWidgets(groupFlags)
 
-        self.__TransferToDiscTables()
+        if (not groupFlags):
+            self.__TransferToDiscTables()
 
     def Validate(self):
         """ Validate the fields on the main window.

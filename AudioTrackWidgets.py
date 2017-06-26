@@ -34,6 +34,8 @@ class AudioTrackWidgets(object):
         self.primaryMixdownWidget = primaryMixdownWidget
         self.secondaryMixdownWidget = secondaryMixdownWidget
 
+        self.trackWidget.currentTextChanged.connect(self.onSignal_trackWidget_currentTextChanged)
+
     # def __str__(self):
     #     return '{}: id={}, index={}, track={}, primaryMixdown={}, secondaryMixdown={}'\
     #         .format(self.XMLNAME, id(self),
@@ -65,19 +67,20 @@ class AudioTrackWidgets(object):
         self.secondaryMixdownWidget.clear()
         self.secondaryMixdownWidget.addItems(items)
 
-    # def setCurrentText(self, trackText, primaryMixdownText, secondaryMixdownText):
-    #     """ Set the xxx.currentText()/selection for all of the widgets.
-    #     """
-    #     self.trackWidget.setCurrentText(trackText)
-    #     self.primaryMixdownWidget.setCurrentText(primaryMixdownText)
-    #     self.secondaryMixdownWidget.setCurrentText(secondaryMixdownText)
-
     def setEnabled(self, enabled):
         """ Enable/disable all of the audio track widgets.
         """
         self.trackWidget.setEnabled(enabled)
         self.primaryMixdownWidget.setEnabled(enabled)
         self.secondaryMixdownWidget.setEnabled(enabled)
+
+    def onSignal_trackWidget_currentTextChanged(self, text=None):
+        """ Enable/disable the mixdown widgets, based on the track widget.
+        """
+        enableMixdowns = (self.trackWidget.currentText() != '')
+
+        self.primaryMixdownWidget.setEnabled(enableMixdowns)
+        self.secondaryMixdownWidget.setEnabled(enableMixdowns)
 
     def setTrackStateFromWidgets(self, trackState):
         """ Sets the trackState attributes from the audio track widgets.
@@ -152,6 +155,12 @@ class AudioTrackWidgetsList(MutableSequence):
         """
         for trackWidgets in self.trackWidgetsList:
             trackWidgets.addMixdownItems(items)
+
+    def enableMixdowns(self):
+        """ Enable/disable the mixdown widgets for all entries in the list.
+        """
+        for trackWidgets in self.trackWidgetsList:
+            trackWidgets.onSignal_trackWidget_currentTextChanged()
 
     def setEnabled(self, enabled):
         """ Enable/disable all of the audio track widgets.

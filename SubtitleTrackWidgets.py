@@ -37,6 +37,7 @@ class SubtitleTrackWidgets(object):
         self.burnWidget = burnWidget
         self.defaultWidget = defaultWidget
 
+        self.trackWidget.currentTextChanged.connect(self.onSignal_trackWidget_currentTextChanged)
         self.burnWidget.clicked.connect(self.onCheckBox_stateChanged_Burn)
         self.defaultWidget.clicked.connect(self.onCheckBox_stateChanged_Default)
 
@@ -62,6 +63,15 @@ class SubtitleTrackWidgets(object):
         """
         self.trackWidget.clear()
         self.trackWidget.addItems(items)
+
+    def onSignal_trackWidget_currentTextChanged(self, text=None):
+        """ Enable/disable the mixdown widgets, based on the track widget.
+        """
+        enableCheckBoxes = (self.trackWidget.currentText() != '')
+
+        self.forcedWidget.setEnabled(enableCheckBoxes)
+        self.burnWidget.setEnabled(enableCheckBoxes)
+        self.defaultWidget.setEnabled(enableCheckBoxes)
 
     def setEnabled(self, enabled):
         """ Enable/disable all of the subtitle track widgets.
@@ -174,6 +184,12 @@ class SubtitleTrackWidgetsList(MutableSequence):
         """
         for trackWidgets in self.trackWidgetsList:
             trackWidgets.addMixdownItems(items)
+
+    def enableCheckBoxes(self):
+        """ Enable/disable the checkboxes for all entries in the list
+        """
+        for trackWidgets in self.trackWidgetsList:
+            trackWidgets.onSignal_trackWidget_currentTextChanged()
 
     def setEnabled(self, enabled):
         """ Enable/disable all of the subtitle track widgets.
