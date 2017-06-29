@@ -20,8 +20,6 @@ from collections import MutableSequence
 
 from SubtitleTrackStates import (SubtitleTrackState, SubtitleTrackStates)
 
-# TODO button to open log file
-
 class SubtitleTrackWidgets(object):
     """ Contains the widgets for a single subtitle track.
     """
@@ -196,9 +194,6 @@ class SubtitleTrackWidgetsList(MutableSequence):
         """
         for trackWidgets in self.trackWidgetsList:
             trackWidgets.setEnabled(enabled)
-
-    # TODO rename subtitleTrackStates to trackStates; do the same for audioTrackStates
-    # TODO add instance assert; subtitleTrackStates is SubtitleTrackStates; same for audioTrackStates
 
     def setTrackStatesFromWidgets(self, trackStates):
         """ Set the list of subtitle track states from list of widgets.

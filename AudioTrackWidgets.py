@@ -186,3 +186,16 @@ class AudioTrackWidgetsList(MutableSequence):
 
         for idx in range(len(trackStates)):
             self.trackWidgetsList[idx].setWidgetsFromTrackState(trackStates[idx])
+
+    def Validate(self):
+        """ At least one track with at least one mixdown must be selected for
+            the audio track widgets to be valid.
+        """
+
+
+
+
+
+
+
+        return False

@@ -17,4 +17,4 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 __DEVELOPEMENT__ = True
-__TESTING_DO_NOT_SAVE_SESSION__ = True
+__TESTING_DO_NOT_SAVE_SESSION__ = False

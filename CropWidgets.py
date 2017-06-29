@@ -24,9 +24,6 @@ class CropWidgets(object):
     """ Contains the widgets for custom cropping.
     """
 
-    # TODO resolve data transfer, enable/disable conflict between data/widget connectors
-    # and widget collection classes like this one.
-
     def __init__(self, parent, topWidget, bottomWidget, leftWidget, rightWidget):
 
         self.__parent = parent

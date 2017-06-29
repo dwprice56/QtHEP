@@ -45,22 +45,21 @@ class MyApplication(QApplication):
 
         self.mainWindow = None
 
+        self.setOrganizationName('QtHEP')
         self.setApplicationName('QtHEP')
         QStandardPaths.setTestModeEnabled(__DEVELOPEMENT__)
 
         preferencesPath = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
         if (not os.path.exists(preferencesPath)):
             os.makedirs(preferencesPath)
-        self.preferencesFilename = os.path.join(preferencesPath, 'QtHEP.preferences.xml')
+        self.preferencesFilename = os.path.join(preferencesPath, '{}.preferences.xml'.format(self.applicationName()))
 
         self.preferences = Preferences()
         if (os.path.exists(self.preferencesFilename)):
             self.preferences.FromXML(self.preferencesFilename)
+            self.preferences.logging.InitLog()
         else:
             self.preferences.ToXML(self.preferencesFilename)
-            # TODO log this action
-
-        self.preferences.logging.InitLog()
 
         DiscFilenameTemplatesSingleton().Set(self.preferences.filenameTemplates)
         DiscPresetsSingleton().Set(self.preferences.presets.GetNames())
@@ -69,6 +68,46 @@ class MyApplication(QApplication):
 
         TitleVisibleSingleton().Set(self.preferences.autoTitle.minimumTitleSeconds,
             self.disc.hideShortTitles)
+
+
+
+
+
+
+        self.defaultSessionFilename = "{}.state.xml".format(self.applicationName())
+
+        if __DEVELOPEMENT__:
+        # 	self.settingsFilename = os.path.join(os.getcwd(), "{}.settings.xml".format(APP_NAME))
+        # 	self.fullDefaultSessionFilename = os.path.join(os.getcwd(), self.defaultSessionFilename)
+            s = os.path.join(os.getcwd(), 'TestFiles')
+            self.temporarySessionFilename = os.path.join(s, "temp.{}".format(self.defaultSessionFilename))
+        # 	self.logFilename = os.path.join(os.getcwd(), "{}.log".format(APP_NAME))
+        else:
+            if (os.path.exists(self.standardPaths.GetUserDataDir()) == False):
+                os.makedirs(self.standardPaths.GetUserDataDir())
+                SingletonLog().writeline('{} created'.format(self.standardPaths.GetUserDataDir()))
+
+        # 	self.settingsFilename = os.path.join(self.standardPaths.GetUserDataDir(), "{}.settings.xml".format(APP_NAME))
+        # 	self.fullDefaultSessionFilename = os.path.join(self.standardPaths.GetUserDataDir(), self.defaultSessionFilename)
+            self.temporarySessionFilename = os.path.join(self.standardPaths.GetUserDataDir(), "temp.{}".format(self.defaultSessionFilename))
+        # 	self.logFilename = os.path.join(self.standardPaths.GetDocumentsDir(), "{}.log".format(APP_NAME))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     @property
     def hashSessionFilename(self):

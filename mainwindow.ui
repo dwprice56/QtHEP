@@ -687,7 +687,7 @@
              </property>
              <layout class="QGridLayout" name="gridLayout_6">
               <item row="0" column="0">
-               <widget class="QToolButton" name="toolButton_Disc_Find_AudioTracks">
+               <widget class="QToolButton" name="toolButton_Disc_AudioTracks_Find">
                 <property name="toolTip">
                  <string>Select audio tracks from the first selected title.</string>
                 </property>
@@ -909,7 +909,7 @@
                </widget>
               </item>
               <item row="0" column="0">
-               <widget class="QToolButton" name="toolButton_Disc_Find_SubtitleTrack">
+               <widget class="QToolButton" name="toolButton_Disc_SubtitleTracks_Find">
                 <property name="toolTip">
                  <string>Find the subtitle track for the first selected title.</string>
                 </property>
@@ -1182,7 +1182,7 @@
                <bool>true</bool>
               </property>
              </widget>
-             <widget class="QToolButton" name="toolButton_Disc_Find_Crop">
+             <widget class="QToolButton" name="toolButton_Disc_Crop_Find">
               <property name="geometry">
                <rect>
                 <x>203</x>
@@ -3513,6 +3513,11 @@
     <property name="title">
      <string>File</string>
     </property>
+    <widget class="QMenu" name="menuOpen_Recent">
+     <property name="title">
+      <string>Open Recent</string>
+     </property>
+    </widget>
     <addaction name="actionBrowse_for_Video"/>
     <addaction name="actionBrowse_for_Destination"/>
     <addaction name="separator"/>
@@ -3524,13 +3529,24 @@
     <addaction name="actionDelete_Hash_Session"/>
     <addaction name="separator"/>
     <addaction name="actionOpen_Session"/>
-    <addaction name="actionOpen_Recent"/>
+    <addaction name="menuOpen_Recent"/>
     <addaction name="separator"/>
     <addaction name="actionPreferences"/>
     <addaction name="separator"/>
     <addaction name="actionQuit"/>
    </widget>
+   <widget class="QMenu" name="menuTools">
+    <property name="title">
+     <string>Tools</string>
+    </property>
+    <addaction name="action_LogFile_Open"/>
+    <addaction name="action_LogFile_Clear"/>
+    <addaction name="separator"/>
+    <addaction name="action_RecentFileList_RemoveMissingFiles"/>
+    <addaction name="action_RecentFileList_Clear"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuTools"/>
   </widget>
   <widget class="QStatusBar" name="statusBar">
    <property name="autoFillBackground">
@@ -3595,11 +3611,6 @@
     <string>Ctrl+O</string>
    </property>
   </action>
-  <action name="actionOpen_Recent">
-   <property name="text">
-    <string>Open Recent</string>
-   </property>
-  </action>
   <action name="actionPreferences">
    <property name="text">
     <string>Preferences...</string>
@@ -3608,6 +3619,36 @@
   <action name="actionQuit">
    <property name="text">
     <string>Quit</string>
+   </property>
+  </action>
+  <action name="actionfile_1">
+   <property name="text">
+    <string>file 1</string>
+   </property>
+  </action>
+  <action name="actionfile_2">
+   <property name="text">
+    <string>file 2</string>
+   </property>
+  </action>
+  <action name="action_RecentFileList_RemoveMissingFiles">
+   <property name="text">
+    <string>Remove missing files from recent file list</string>
+   </property>
+  </action>
+  <action name="action_RecentFileList_Clear">
+   <property name="text">
+    <string>Clear the recent file list</string>
+   </property>
+  </action>
+  <action name="action_LogFile_Clear">
+   <property name="text">
+    <string>Clear log file</string>
+   </property>
+  </action>
+  <action name="action_LogFile_Open">
+   <property name="text">
+    <string>Open log file</string>
    </property>
   </action>
  </widget>

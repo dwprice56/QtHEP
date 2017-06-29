@@ -27,9 +27,14 @@ sys.path.insert(0, '/home/dave/QtProjects/DiscData')
 # from PyQt5.QtWidgets import QTreeWidgetItem
 from PyQt5.QtGui import QIcon
 # from PyQt5.QtGui import QString
-from PyQt5.QtCore import Qt
-from PyQt5.QtCore import QProcess
+from PyQt5.QtCore import (
+    Qt,
+    QFileInfo,
+    QProcess,
+    QSettings
+)
 from PyQt5.QtWidgets import (
+    QAction,
     QApplication,
     QCheckBox,
     QFileDialog,
@@ -37,6 +42,7 @@ from PyQt5.QtWidgets import (
     QHeaderView,
     QInputDialog,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QTableWidgetItem,
     QWidget
@@ -56,10 +62,8 @@ from PyQt5WidgetDataConnectors import (
 )
 
 from PyQt5OverrideCursor import QWaitCursor
-from PyQt5Helpers import (
-    GetVolumeLabel,
-    AddItemToTableWidgetCell
-)
+from PyQt5Helpers import AddItemToTableWidgetCell
+from PyQt5RecentFiles import QRecentFiles
 from PyQt5Validators import (
     QComboBox_NotEmpty_Validator,
     QLineEdit_FolderExists_Validator,
@@ -89,6 +93,7 @@ from Titles import (
     Titles,
     TitleVisibleSingleton
 )
+from Helpers import GetFolderVolumeLabel
 from PyHelpers import NormalizeFileName
 
 VerticalHeadersVisible = namedtuple('VerticalHeadersVisible', ['firstVisualIndex',
@@ -143,7 +148,12 @@ class Disc_Source_Validator(QLineEdit_FolderExists_Validator):
 
         return False
 
-class MyMainWindow(QMainWindow, Ui_MainWindow):
+# TODO @abstactmethod
+
+# TODO resolve data transfer, enable/disable conflict between data/widget connectors
+# and widget collection classes like this one.
+
+class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
     WIDGET_GROUP_DISC_AUTO_AUDIO    = 0x0001
     WIDGET_GROUP_DISC_AUTO_SUBTITLE = 0x0002
@@ -156,9 +166,17 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     TAB_INDEX_SUBTITLES      = 4
     TAB_INDEX_CROPPING       = 5
 
+    MAX_RECENT_FILES = 10
+
+    STATE_FILES_SELECTION_FILTER = 'State files (*.state.xml);;All files (*, *.*)'
+    STATE_FILES_DOCUMENT_ROOT    = 'HEP'
+
     def __init__(self, parent=None):
         super(MyMainWindow, self).__init__(parent)
+        QRecentFiles.__init__(self)
+
         self.setupUi(self)
+        self.setupRecentFiles(self.menuOpen_Recent, self.onAction_Disc_Open_RecentFile, 'QHEP')
 
         # self.__tabIcon_Highlight = QIcon('images/draw_ellipse_16.png')
         self.__tabIcon_Clear = QIcon()
@@ -178,11 +196,25 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             self.spinBox_DiscTitle_Crop_Top, self.spinBox_DiscTitle_Crop_Bottom,
             self.spinBox_DiscTitle_Crop_Left, self.spinBox_DiscTitle_Crop_Right)
 
+        # File menu actions
+        # ======================================================================
         self.actionBrowse_for_Video.triggered.connect(self.onAction_Disc_Source_Browse)
         self.actionBrowse_for_Destination.triggered.connect(self.onAction_Disc_Destination_Browse)
         self.actionSave_Hash_Session.triggered.connect(self.onAction_Disc_Save_HashSession)
+        self.actionSave_Session.triggered.connect(self.onAction_Disc_Save_Session)
+        self.actionSave_Session_As.triggered.connect(self.onAction_Disc_Save_SessionAs)
+        self.actionSave_Temporary_Session.triggered.connect(self.onAction_Disc_Save_TemporarySession)
+        self.actionDelete_Hash_Session.triggered.connect(self.onAction_Disc_Delete_Hash_Session)
+        self.actionOpen_Session.triggered.connect(self.onAction_Disc_Open_Session)
         self.actionPreferences.triggered.connect(self.onAction_EditPreferences)
         self.actionQuit.triggered.connect(QApplication.instance().quit)
+
+        # Tool menu actions
+        # ======================================================================
+        self.action_LogFile_Clear.triggered.connect(self.onAction_LogFile_Clear)
+        self.action_LogFile_Open.triggered.connect(self.onAction_LogFile_Open)
+        self.action_RecentFileList_Clear.triggered.connect(self.onAction_RecentFileList_Clear)
+        self.action_RecentFileList_RemoveMissingFiles.triggered.connect(self.onAction_RecentFileList_RemoveMissingFiles)
 
         self.__init_Disc_Fields()
         self.__init_Disc_FilenameAndNotesFields()
@@ -243,8 +275,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 * Create the widget/data connectors.
                 * Create the validators.
         """
-        # TODO enable/disable this button if title count > 0
-        self.toolButton_Disc_Find_AudioTracks.clicked.connect(self.onButton_Disc_AudioTracks_Find)
+        self.toolButton_Disc_AudioTracks_Find.clicked.connect(self.onButton_Disc_AudioTracks_Find)
 
         # Connect the widgets to the data items.
         # ======================================================================
@@ -312,8 +343,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # Create the validators.
         # ======================================================================
 
-        # TODO make sure all of the selected audio tracks exist in all of the selected titles.
-        # TODO make sure at least on mixdown is selected
+        # TODO make sure all of the selected audio tracks and subtitle tracks exist in all of the selected titles.
+        # TODO make sure at least one mixdown is selected
 
     def __init_Disc_Cropping(self):
         """ For the disc cropping widgets:
@@ -323,8 +354,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 * Create the validators.
         """
 
-        # TODO enable/disable this button if title count > 0
-        self.toolButton_Disc_Find_Crop.clicked.connect(self.onButton_Disc_Cropping_Find)
+        self.toolButton_Disc_Crop_Find.clicked.connect(self.onButton_Disc_Cropping_Find)
         self.radioButton_Disc_Crop_Automatic.setChecked(True)   # Forces the disc cropping spin buttons to disabled.
 
         # Connect the widgets to the data items.
@@ -362,8 +392,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # Create the validators.
         # ======================================================================
 
-        # TODO make sure all of the selected audio tracks exist in all of the selected titles.
-        # TODO make sure at least on mixdown is selected
+        # TODO make sure top, bottome, left, right range is valid
 
     def __init_Disc_Fields(self):
         """ For the disc widgets:
@@ -374,8 +403,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         """
 
         # TODO add "override automatic read" check box.  only enabled (visible?) if automatic disc sessions (preferences) is enabled.
-        # TODO add "open hash file" menu item, tool button
-        # TODO add "Save to..." submenu?
+        # TODO add "open hash file" menu item
+        # TODO On source browse or read: automatic session file exists.  do you want to open it?
 
         self.pushButton_Disc_Source_Browse.clicked.connect(self.onAction_Disc_Source_Browse)
         self.pushButton_Disc_Destination_Browse.clicked.connect(self.onAction_Disc_Destination_Browse)
@@ -388,7 +417,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.toolButton_Disc_RunVLC.clicked.connect(self.onButton_Disc_VLC)
 
         # Volume labels are only available under Windows.
-        self.toolButton_Disc_GetSourceDiskLabel.setVisible(sys.platform == 'win32')
+        # self.toolButton_Disc_GetSourceDiskLabel.setVisible(sys.platform == 'win32')
         self.toolButton_Disc_GetSourceDiskLabel.clicked.connect(self.onButton_Disc_SourceDiskLabel_Get)
         self.toolButton_Disc_EditSourceDiskLabel.clicked.connect(self.onButton_Disc_SourceDiskLabel_Edit)
 
@@ -460,8 +489,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 * Create the validators.
         """
 
-        # TODO enable/disable this button if title count > 0
-        self.toolButton_Disc_Find_SubtitleTrack.clicked.connect(self.onButton_Disc_SubtitleTracks_Find)
+        self.toolButton_Disc_SubtitleTracks_Find.clicked.connect(self.onButton_Disc_SubtitleTracks_Find)
 
         # Connect the widgets to the data items.
         # ======================================================================
@@ -520,10 +548,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             self.disc.subtitleTrackStates[2], 'default',
             self.WIDGET_GROUP_DISC_AUTO_SUBTITLE))
 
-
-
-        # TODO Only one default, only one burned, a subtitle can't be both burned and default
-
         # Add the widgets to the list of widget rows.
         # ======================================================================
         self.__disc_subtitleTrackWidgets.append(SubtitleTrackWidgets(
@@ -550,9 +574,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         # Create the validators.
         # ======================================================================
-
-        # TODO make sure all of the selected audio tracks exist in all of the selected titles.
-        # TODO make sure at least on mixdown is selected
 
     def __init_DiscTitle_DetailWidgets(self):
         """ Initialze the widgets used to display the detail information for a
@@ -750,7 +771,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     def Load_Disc_FilenameTemplates(self):
         """ Load the filename templates QComboBox from the preferences.
         """
-
         text = self.comboBox_Disc_Mask.currentText()
 
         self.comboBox_Disc_Mask.clear()
@@ -762,28 +782,12 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     def Load_Disc_Mixdowns(self):
         """ Load the titles mixdown ComboBoxes from the preferences.
         """
-
-        # TODO enable/disable mixdown combo boxes -- if track is ''
-
         mixdowns = ['']
         for mixdown in self.preferences.mixdowns:
             mixdowns.append(mixdown.name)
         self.__disc_audioTrackWidgets.addMixdownItems(mixdowns)
 
         self.groupBox_Disc_AudioTracks.updateGeometry()
-
-    # def Load_Disc_MixdownTrackNumbers(self):
-    #     """ Load the titles mixdown track ComboBoxes from the preferences.
-    #     """
-    #
-    #     # TODO use real track number from the Disc?  Must use highest available track number,
-    #     #   can't change this per title because it applies to all titles.
-    #     #   Probably not worth the effort.  If not, move this to __init_Disc_AudioTracks.
-    #     #   Should these be spinboxes instead?
-    #
-    #     self.comboBox_Disc_AudioTracks_SelectTrack_First.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-    #     self.comboBox_Disc_AudioTracks_SelectTrack_Second.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-    #     self.comboBox_Disc_AudioTracks_SelectTrack_Third.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
 
     def Load_Disc_Presets(self):
         """ Load the presets QComboBox from the preferences.
@@ -797,31 +801,9 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.comboBox_Disc_Preset.setCurrentText(text)
 
-    # def Load_Disc_SubtitleTrackNumbers(self):
-    #     """ Load the titles mixdown track ComboBoxes from the preferences.
-    #     """
-    #
-    #     self.comboBox_Disc_SubtitleTracks_SelectTrack_First.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
-    #     self.comboBox_Disc_SubtitleTracks_SelectTrack_Second.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
-    #     self.comboBox_Disc_SubtitleTracks_SelectTrack_Third.addItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
-
-    # def Load_DiscTitle_MixdownTrackNumbers(self):
-    #     """ Load the titles mixdown track ComboBoxes from the preferences.
-    #     """
-    #
-    #     # TODO use real track number from the Disc?  Must use highest available track number, can't change this per title because it applies to all titles.
-    #     #       Probably not worth the effort.  If not, move this to __init_Disc_AudioTracks.
-    #
-    #     self.comboBox_DiscTitle_AudioTracks_SelectTrack_First.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-    #     self.comboBox_DiscTitle_AudioTracks_SelectTrack_Second.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-    #     self.comboBox_DiscTitle_AudioTracks_SelectTrack_Third.addItems(AudioTrackState.AUDIO_TRACK_CHOICES)
-
     def Load_DiscTitle_Mixdowns(self):
         """ Load the titles mixdown ComboBoxes from the preferences.
         """
-
-        # TODO enable/disable mixdown combo boxes -- if track is ''
-
         mixdowns = ['']
         for mixdown in self.preferences.mixdowns:
             mixdowns.append(mixdown.name)
@@ -844,7 +826,26 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
     # TODO When enabling/disabling the All/Range/Episode radio buttons don't enable
     # the buttons if self.activeTitle() is None.
-    # TODO Validate source - make sure the source folder has a VIDEO_TS folder.
+
+    def onAction_Disc_Delete_Hash_Session(self):
+        """ Delete the hash session file, if it exists.
+        """
+        filename = QApplication.instance().hashSessionFilename
+
+        if (self.preferences.discSession.autoDiscSessions):
+            filename = self.preferences.discSession.GetFullFilename(filename)
+
+        if (os.path.exists(filename)):
+            result = QMessageBox.question(self, 'Delete Hash State File?',
+                'Are you sure you want to delete hash state file "{}"?'.format(filename))
+            if (result != QMessageBox.Yes):
+                return
+
+            os.unlink(filename)
+            self.statusBar.showMessage('Session state file "{}" deleted.'.format(filename), 15000)
+        else:
+            QMessageBox.information(self, 'File Not Found',
+                'Hash state file "{}" was not found.'.format(filename))
 
     def onAction_Disc_Destination_Browse(self):
         """ Select a folder where the transcoded video files will be saved.
@@ -857,11 +858,68 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.lineEdit_Disc_Destination.setText(destinationFolder)
         self.Validator_Disc_Destination.clearHighlight()
 
-    def onAction_Disc_Save_HashSession(self):
-        """ Create an xml file using the disc hash.  The file will contain the disc
-            information and the disc state data.
+    def onAction_Disc_Open_RecentFile(self):
+        """ Open a session file from the recent file list.
         """
-        self.__SaveSession(QApplication.instance().hashSessionFilename)
+        action = self.sender()
+        if action:
+            filename = action.data()
+
+            if (not os.path.exists(filename)):
+                QMessageBox.critical(self, 'File Not Found',
+                    'File "{}" was not found.'.format(filename))
+                return
+
+            self.__LoadSession(filename)
+
+    def onAction_Disc_Open_Session(self):
+        """ Select a session file and open it.
+        """
+        filename, selectedFilter = QFileDialog.getOpenFileName(self,
+            'Select Session File', filter=self.STATE_FILES_SELECTION_FILTER)
+
+        if (not filename):
+            return
+
+        self.__LoadSession(filename)
+
+    def onAction_Disc_Save_HashSession(self):
+        """ Create an xml file using the disc hash.  The file will contain the
+            disc information and the disc state data.
+        """
+        filename = QApplication.instance().hashSessionFilename
+
+        if (self.preferences.discSession.autoDiscSessions):
+            filename = self.preferences.discSession.GetFullFilename(filename)
+
+        self.__SaveSession(filename)
+
+    def onAction_Disc_Save_Session(self):
+        """ Create an xml file using the current file name.  The file will
+            contain the disc information and the disc state data.
+        """
+        if (self.currentFile):
+            self.__SaveSession(self.currentFile)
+        else:
+            self.onAction_Disc_Save_SessionAs()
+
+    def onAction_Disc_Save_SessionAs(self):
+        """ Create an xml file using a user supplied file name.  The file will
+            contain the disc information and the disc state data.
+        """
+        dlg = QFileDialog(self, 'Save Session As', filter=self.STATE_FILES_SELECTION_FILTER)
+        dlg.setDefaultSuffix('state.xml')
+        dlg.setAcceptMode(QFileDialog.AcceptSave)
+        dlg.setFileMode(QFileDialog.AnyFile)
+        if (dlg.exec()):
+            self.__SaveSession(dlg.selectedFiles()[0])
+        del dlg
+
+    def onAction_Disc_Save_TemporarySession(self):
+        """ Create an xml file using the user supplied file name.  The file will
+            contain the disc information and the disc state data.
+        """
+        self.__SaveSession(QApplication.instance().temporarySessionFilename)
 
     def onAction_Disc_Source_Browse(self):
         """ Find a video folder with containing a copy of a DVD or BluRay disc
@@ -906,10 +964,35 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             DiscPresetsSingleton().Set(self.preferences.presets.GetNames())
             TitleVisibleSingleton().minimumTitleSeconds = self.preferences.autoTitle.minimumTitleSeconds
 
-            log = SingletonLog()
-            log.writeline('Preferences updated')
+            SingletonLog().writeline('Preferences updated')
+            self.statusBar.showMessage('Preferences updated.', 15000)
+            QApplication.beep()
 
-            # TODO status bar message x2
+    def onAction_LogFile_Clear(self):
+        """ Empty the log file.
+        """
+        SingletonLog().clear()
+        self.statusBar.showMessage('Log file cleared.', 15000)
+        QApplication.beep()
+
+    def onAction_LogFile_Open(self):
+        """ Open the log file.
+        """
+        SingletonLog().view()
+
+    def onAction_RecentFileList_Clear(self):
+        """ Remove all files from the recent file list.
+        """
+        self.clearRecentFiles()
+        self.statusBar.showMessage('Recent file list updated.', 15000)
+        QApplication.beep()
+
+    def onAction_RecentFileList_RemoveMissingFiles(self):
+        """ Remove files that don't exist from the recent file list.
+        """
+        self.removeDeadRecentFiles()
+        self.statusBar.showMessage('Recent file list updated.', 15000)
+        QApplication.beep()
 
     def onButton_Disc_AudioTracks_Find(self):
         """ Find the audio track and mixdown settings for the first visible,
@@ -934,6 +1017,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_AUDIO)
         self.statusBar.showMessage('Audio track selections updated.', 15000)
+        QApplication.beep()
 
     def onButton_Disc_AudioAndSubtitleTracks_Find(self):
         """ Find the audio track & mixdown and the subtitle track settings for
@@ -961,7 +1045,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_AUDIO)
         self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_SUBTITLE)
-        self.statusBar.showMessage('Audio track selections updated.', 15000)
+        self.statusBar.showMessage('Audio and subtitle track selections updated.', 15000)
+        QApplication.beep()
 
     def onButton_Disc_Cropping_Find(self):
         """ Find the cropping values for the first selected title. Then set the
@@ -984,6 +1069,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.TransferToWindow(self.WIDGET_GROUP_DISC_CROP)
         self.statusBar.showMessage('Cropping selections updated.', 15000)
+        QApplication.beep()
 
     def onButton_Disc_Reset_EpisodeNumberPrecision(self):
         """ Reset the first episode number precision to it's default value.
@@ -1018,7 +1104,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         if (not self.__ReadSource()):
             return
 
-        # TODO default destination was not set.
+        self.__onNewSource()
+        self.disc.source = self.lineEdit_Disc_Source.text()
 
         self.TransferToWindow()
 
@@ -1035,11 +1122,23 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
     def onButton_Disc_SourceDiskLabel_Get(self):
         """ Get the volume label for the disk where the source is located.
 
-            Only Windows disks have volume labels.
+            Windows drives may or may not have volume labels.  If we're running
+            on Windows and the drive has a volume label, use it.
+
+            If we're not running on Windows, or if the drive does not have a
+            label, look for a ".volumeLabel" file in the source folder (if
+            present).  If it's not there, look for it one folder level up.
+            When/if it's found, read the first line and use that as the volume
+            label.
         """
-        if (sys.platform == 'win32'):
-            volumeLabel = GetVolumeLabel(lineEdit_Disc_Source.text())
-            self.lineEdit_Disc_DiskLabel.setText(volumeLabel)
+        source = self.lineEdit_Disc_Source.text()
+        if (not source):
+            return
+
+        volumeLabel = GetFolderVolumeLabel(source)
+
+        self.lineEdit_Disc_DiskLabel.setText(volumeLabel)
+        self.disc.sourceLabel = volumeLabel
 
     def onButton_Disc_SubtitleTracks_Find(self):
         """ Find the Subtitle track for the first selected title. Then set the
@@ -1063,9 +1162,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.TransferToWindow(self.WIDGET_GROUP_DISC_AUTO_SUBTITLE)
         self.statusBar.showMessage('Subtitle track selections updated.', 15000)
-
-
-        # TODO subtitle tracks validators - if burn, focus or default checked then corresponding combobox must have a track selected.
+        QApplication.beep()
 
     def onButton_Disc_VLC(self):
         """ Start VLC using the source path.
@@ -1116,6 +1213,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.onDiscTitle_AudioTracks_EnableWidgets()
 
         self.statusBar.showMessage('Title audio track states cleared.', 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_AudioTracks_Find(self):
         """ Find the current audio track settings for the active title.
@@ -1132,6 +1230,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.onDiscTitle_AudioTracks_EnableWidgets()
 
         self.statusBar.showMessage('Title audio track states found and set.', 15000)
+        QApplication.beep()
 
     def __DiscTitle_AudioTrackStatesToWidgets(self, title):
         """ Transfer the title data to the title audio track state widgets on
@@ -1155,6 +1254,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.spinBox_DiscTitle_ChapterRange_Last.setValue(title.chapters.highestChapterNumber)
 
         self.statusBar.showMessage('Chapter ranges reset.', 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_Chapters_ExportNames(self):
         """ Export the chapter names to a text file.
@@ -1188,6 +1288,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
                 f.write("CHAPTER{:02d}NAME={}\n".format(chapter.chapterNumber, self.tableWidget_Disc_Chapters.item(idx, 3).text()))
 
         self.statusBar.showMessage('Chapter names exported to {}.'.format(result[0]), 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_Chapters_ImportNames(self):
         """ Import chapter names from a ChaptersDB.org text file.
@@ -1218,6 +1319,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.onDiscTitle_Chapters_EnableWidgets()
 
         self.statusBar.showMessage('Chapter names imported from {}.'.format(result[0]), 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_Chapters_ResetFirstChapter(self):
         """ Reset the first chapter number.
@@ -1225,6 +1327,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.spinBox_Disc_Chapters_FirstChapter.setValue(1)
 
         self.statusBar.showMessage('First chapter number reset to 1.', 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_Chapters_ResetNames(self):
         """ Reset the chapter names to their default values.
@@ -1243,13 +1346,13 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         chapter = self.tableWidget_Disc_Chapters.item(idx, 0).data(Qt.UserRole)
 
         if (not chapter.isShortChapter):
-            result = QMessageBox.question(self, 'Set Short Chapter',
-                'Chapter () is not a short chapter.  Do you want to continue?'.format(chapter.chapterNumber))
+            result = QMessageBox.question(self, 'Set Short Chapter?',
+                'Chapter {} is not a short chapter.  Do you want to continue?'.format(chapter.chapterNumber))
             if (result != QMessageBox.Yes):
                 return
 
         if (self.tableWidget_Disc_Chapters.item(idx, 3).text() != chapter.defaultName):
-            result = QMessageBox.question(self, 'Set Short Chapter',
+            result = QMessageBox.question(self, 'Set Short Chapter?',
                 'The name for chapter {} is not the default name.  Do you want to continue?'.format(chapter.chapterNumber))
             if (result != QMessageBox.Yes):
                 return
@@ -1258,6 +1361,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.statusBar.showMessage('The name for chapter {} was set to {}.'.format(chapter.chapterNumber,
             self.preferences.options.textImportShortChapter), 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_ClearSelections(self):
         """ Clear the selected attribute for all of the selected titles.
@@ -1269,6 +1373,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             checkBox.setChecked(False)
 
         self.statusBar.showMessage('Title selections cleared.', 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_CopyEpisode(self):
         """ Copy a chapter episode.
@@ -1307,6 +1412,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.onDiscTitle_Cropping_EnableWidgets()
 
         self.statusBar.showMessage('Title cropping states cleared.', 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_Crop_Find(self):
         """ Clear the current audio track settings for the active title.
@@ -1321,6 +1427,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.onDiscTitle_Cropping_EnableWidgets()
 
         self.statusBar.showMessage('Title cropping states found and set.', 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_DeleteEpisode(self):
         """ Delete an episode from a titles.
@@ -1353,7 +1460,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         rowCount = self.tableWidget_DiscTitle_Episodes.rowCount()
 
-        result = QMessageBox.question(self, 'Delete All Episodes',
+        result = QMessageBox.question(self, 'Delete All Episodes?',
             'Are you sure you want to delete all {} episodes?'.format(rowCount))
         if (result != QMessageBox.Yes):
             return
@@ -1463,6 +1570,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.onDiscTitle_SubtitleTracks_EnableWidgets()
 
         self.statusBar.showMessage('Title subtitle track states cleared.', 15000)
+        QApplication.beep()
 
     def onButton_DiscTitle_SubtitleTracks_Find(self):
         """ Clear the current subtitle track settings for the active title.
@@ -1479,6 +1587,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.onDiscTitle_SubtitleTracks_EnableWidgets()
 
         self.statusBar.showMessage('Title subtitle track states found and set.', 15000)
+        QApplication.beep()
 
     def __DiscTitle_SubtitleTrackStatesToWidgets(self, title):
         """ Transfer the title data to the title subtitle track state widgets on
@@ -1624,19 +1733,10 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_SUBTITLES,
             self.radioButton_DiscTitle_SubtitleTracks_Default.isChecked())
 
-    # TODO add status bar messages for lots of actions
-    # TODO data connectors for title detail widgets
-    # TODO refactor method names, especially buttons | onButton_DiscTitle_Chapters_ResetNames becomes onButton_Disc_Chapters_ResetNames
-    # TODO onSignal, etc.
-
     # def onDiscTitle_AllChapters(self, enabled):
     #     """ Enable/disable the chapter range controls in response to the all
     #         chapters radio button.
     #     """
-
-
-
-
 
     # def onDisc_Titles_CurrentItemChanged(self, currentItem, previousItem):
     #     """ Triggered when a new title is selected.
@@ -1704,7 +1804,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         self.tableWidget_Disc_Title.item(0, 1).setData(Qt.EditRole, title.vts)
         self.tableWidget_Disc_Title.item(1, 1).setData(Qt.EditRole, title.ttn)
-        self.tableWidget_Disc_Title.item(2, 1).setData(Qt.EditRole, title.cellsRange)
+        self.tableWidget_Disc_Title.item(2, 1).setData(Qt.EditRole, title.cells.range)
         self.tableWidget_Disc_Title.item(3, 1).setData(Qt.EditRole, title.blocks)
         self.tableWidget_Disc_Title.item(4, 1).setData(Qt.EditRole, title.duration)
         self.tableWidget_Disc_Title.item(5, 1).setData(Qt.EditRole, title.sizeRange)
@@ -1760,7 +1860,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             AddItemToTableWidgetCell(self.tableWidget_Disc_Chapters, idx, 0,
                 chapter.chapterNumber, data=chapter, readOnly=True)
             AddItemToTableWidgetCell(self.tableWidget_Disc_Chapters, idx, 1,
-                chapter.cellsString, readOnly=True)
+                chapter.cells.range, readOnly=True)
             AddItemToTableWidgetCell(self.tableWidget_Disc_Chapters, idx, 2,
                 chapter.duration, readOnly=True)
             AddItemToTableWidgetCell(self.tableWidget_Disc_Chapters, idx, 3,
@@ -1797,11 +1897,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.spinBox_DiscTitle_ChapterRange_Last.setValue(title.chapterRanges.lastChapter)
 
-        # if (not len(title.chapterRanges.episodes)):
-        #     title.chapterRanges.AddEpisode(1, 2, 'First')
-        #     title.chapterRanges.AddEpisode(3, 4, 'Second')
-        #     title.chapterRanges.AddEpisode(5, 6, 'Third')
-
         # This works because Python passes class objects by reference.  So, the
         # delegate for the first and second columns and this attribute are all
         # the same object.  Remember, a new spinbox is created every time a cell
@@ -1818,34 +1913,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.tableWidget_DiscTitle_Episodes.resizeColumnsToContents()
         self.onDiscTitle_ChapterRanges_EnableWidgets()
 
-        # Update the title audio state widgets.
-        # ======================================================================
-        # if (title.audioTrackStates.processChoice == title.audioTrackStates.PROCESS_DEFAULT):
-        #     self.radioButton_DiscTitle_AudioTracks_Default.setChecked(True)
-        # else:
-        #     self.radioButton_DiscTitle_AudioTracks_Custom.setChecked(True)       # PROCESS_ALL
-
         self.__DiscTitle_AudioTrackStatesToWidgets(title)
         self.onDiscTitle_AudioTracks_EnableWidgets()
 
-        # Update the title subtitle state widgets.
-        # ======================================================================
-        # if (title.subtitleTrackStates.processChoice == title.subtitleTrackStates.PROCESS_DEFAULT):
-        #     self.radioButton_DiscTitle_SubtitleTracks_Default.setChecked(True)
-        # else:
-        #     self.radioButton_DiscTitle_SubtitleTracks_Custom.setChecked(True)       # PROCESS_ALL
-
         self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
         self.onDiscTitle_SubtitleTracks_EnableWidgets()
-
-        # Update the title crop state widgets.
-        # ======================================================================
-        # if (title.customCrop.processChoice == title.customCrop.PROCESS_DEFAULT):
-        #     self.radioButton_DiscTitle_Crop_Default.setChecked(True)
-        # elif (title.customCrop.processChoice == title.customCrop.PROCESS_AUTOMATIC):
-        #     self.radioButton_DiscTitle_Crop_Automatic.setChecked(True)
-        # else:
-        #     self.radioButton_DiscTitle_Crop_Custom.setChecked(True)       # PROCESS_ALL
 
         self.__DiscTitle_CropStatesToWidgets(title)
         self.onDiscTitle_Cropping_EnableWidgets()
@@ -1915,8 +1987,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         # Update the title crop states.
         # ======================================================================
 
-        # TODO refactor to use data connectors
-
         if self.radioButton_DiscTitle_Crop_Default.isChecked():
             title.customCrop.processChoice = title.customCrop.PROCESS_DEFAULT
         elif self.radioButton_DiscTitle_Crop_Automatic.isChecked():
@@ -1932,8 +2002,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
         # Disc stuff
         # ======================================================================
-        self.onButton_Disc_SourceDiskLabel_Get()
-
         if (not self.lineEdit_Disc_Destination.text()):
             if (self.preferences.newSource.useDefaultDestination):
                 self.lineEdit_Disc_Destination.setText(self.preferences.newSource.defaultDestination)
@@ -1964,25 +2032,59 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             matchingTitles.longestTitle.subtitleTracks,
             self.preferences)
 
-
-
-        # TODO Automatically hide short titles if more than nnn are found.   AnalyzeTitles() function?
-
-
         if (self.preferences.autoCrop.autoCopyCrop):
             self.disc.customCrop.Copy(matchingTitles.longestTitle.autoCrop)
 
-
+        self.onButton_Disc_SourceDiskLabel_Get()
 
         self.Enable_Disc()
         self.__disc_audioTrackWidgets.enableMixdowns()
         self.__disc_subtitleTrackWidgets.enableCheckBoxes()
 
-    # TODO create class for cells and size information (separate classes)
-    # TODO base cells, size, crop classes on list, set?
-    # TODO recent file list
+    # TODO create class for size information
+    # TODO base size, crop classes on list, set?
     # TODO auto save sessions
-    # TODO save to temporary
+
+    def __LoadSession(self, sessionFilename):
+        """ Load the session information from a saved session file.
+        """
+        doc = minidom.parse(sessionFilename)
+
+        if (doc.documentElement.nodeName != self.STATE_FILES_DOCUMENT_ROOT):
+            raise RuntimeError('The session state file does not seem to be an HEP session file!')
+
+        destinationOverride = None
+        if (self.preferences.discSession.keepDestination):
+            destinationOverride = self.lineEdit_Disc_Destination.text().strip()
+
+        for childNode in doc.documentElement.childNodes:
+            if (childNode.localName == self.disc.XMLNAME):
+                self.disc.FromXML(childNode, destinationOverride)
+
+            # elif (childNode.localName == AppState.ApplicationState.XMLName()):
+            #     self.applicationState.FromXML(childNode)
+            #
+            # elif (childNode.localName == Titles.Titles.XMLName()):
+            #     self.titles.FromXML(childNode)
+
+        doc.unlink()
+
+        # if (hash is not None):
+        #     self.applicationState.titlesHash = hash
+        #
+        # if (self.applicationState.titlesHash == ""):
+        #     self.applicationState.titlesHash = self.titles.GetHash()
+        #     self.ShowDiscHash()
+
+        self.setCurrentFile(sessionFilename)
+        self.TransferToWindow()
+
+        self.Enable_Disc()
+        self.__disc_audioTrackWidgets.enableMixdowns()
+        self.__disc_subtitleTrackWidgets.enableCheckBoxes()
+
+        self.statusBar.showMessage('Session loaded from "{}".'.format(sessionFilename), 15000)
+        QApplication.beep()
 
     def __ReadSource(self):
         """ Read the disc with Handbrake from the source with HandBrake, then
@@ -2036,23 +2138,20 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
 
 
 
-
-
-
         self.TransferFromWindow()
 
         dom = minidom.getDOMImplementation()
-        doc = dom.createDocument(None, "HEP", None)
+
+        # TODO save window size and location?  Should this be saved in QSettings?
+            # (I think there is framework support for this.) Do this in main window
+            # initialization/on quit?
+
+        doc = dom.createDocument(None, self.STATE_FILES_DOCUMENT_ROOT, None)
         parentElement = doc.documentElement
 
         # self.frame.SaveState(doc, parentElement)
-        QApplication.instance().disc.ToXML(doc, parentElement)
+        self.disc.ToXML(doc, parentElement)
         # self.titles.ToXML(doc, parentElement)
-
-
-
-
-
 
 
         if (__TESTING_DO_NOT_SAVE_SESSION__):
@@ -2063,16 +2162,12 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
             xmlFile.close()
 
             self.statusBar.showMessage('Session saved to "{}".'.format(sessionFilename), 15000)
-
-
-
-
-
+            QApplication.beep()
 
 
         doc.unlink()
 
-        # self.SaveFileHistory()
+        self.setCurrentFile(sessionFilename)
 
     def onSignal_toggled_Disc_HideShortTitles(self, checked):
         """ Show/hide short titles.
@@ -2106,7 +2201,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow):
         self.tableWidget_Disc_Titles.setRowCount(0)     # remove all existing rows
         self.tableWidget_Disc_Titles.setRowCount(len(self.disc.titles))     # add a row for each title
 
-        # TODO transfer by order number
         titleKeys = sorted(self.disc.titles.titlesByOrderNumber.keys())
         idx = 0
         self.__titleSelection_widgetDataConnectors.clear()

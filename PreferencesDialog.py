@@ -88,18 +88,18 @@ class LogFile_Validator(QLineEditor_Abstract_Validator):
         if (path.is_file()):
             return True
 
-        result = QMessageBox.question(QApplication.instance().mainWindow, 'Create Log File',
+        result = QMessageBox.question(QApplication.instance().mainWindow, 'Create Log File?',
             'Log file {} does not exist.  Do you want to create it?'.format(path.name))
         if (result == QMessageBox.Yes):
             try:
                 path.touch(exist_ok=False)
-                QMessageBox.information(self, 'Create Log File',
+                QMessageBox.information(QApplication.instance().mainWindow, 'Create Log File',
                     'Log file {} was created.'.format(path.name))
 
                 return True
 
             except (FileExistsError, Exception) as err:
-                QMessageBox.critical(self, 'Create Log File Error',
+                QMessageBox.critical(QApplication.instance().mainWindow, 'Create Log File Error',
                     'Unable to create log file "{}".\n{}'.format(path.name, err))
 
         if (self._flags & self.FLAG_HIGHLIGHT_WIDGETS_WITH_ERRORS):
@@ -328,8 +328,8 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
         self.pushButton_BrowseLogFile.clicked.connect(self.onBrowseLogFile)
         self.pushButton_ClearLogFile.clicked.connect(self.onClearLogFile)
 
-        self.checkBox_LogHandBrakeAnalysis.toggled.connect(self.SetEnabledLogFilename)
-        self.checkBox_LogHandBrakeTranscoding.toggled.connect(self.SetEnabledLogFilename)
+        # self.checkBox_LogHandBrakeAnalysis.toggled.connect(self.SetEnabledLogFilename)
+        # self.checkBox_LogHandBrakeTranscoding.toggled.connect(self.SetEnabledLogFilename)
         self.lineEdit_LogFilename.textChanged.connect(self.SetEnabledClearLog)
 
         self.pushButton_BrowseDefaultDestination.clicked.connect(self.onBrowseDefaultDestinationFolder)
@@ -494,7 +494,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
 
         dlg = QFileDialog(QApplication.instance().mainWindow, 'Select HandBrakeCLI',
             self.lineEdit_HandBrakeCLI.text())
-        dlg.setNameFilters(['H*', '*'])
+        dlg.setNameFilters(['HandbrakeCLI (H*, H*.exe)', 'All files (*, *.*)'])
         dlg.setFileMode(QFileDialog.ExistingFile)
         dlg.setFilter(QDir.Files | QDir.Executable)
 
@@ -513,7 +513,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
         dlg.setAcceptMode(QFileDialog.AcceptSave)
         dlg.setDefaultSuffix('txt')
         dlg.setFilter(QDir.Files | QDir.Writable)
-        dlg.setNameFilters(['Text files (*.txt)', 'All files (*)'])
+        dlg.setNameFilters(['Text files (*.txt)', 'All files (*, *.*)'])
 
         result = dlg.exec_()
         if (result):
@@ -524,12 +524,9 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
     def onBrowseVLC(self):
         """ Browse for the location of the VLC executable.
         """
-
-        # TODO replace custom dialogs with static dialogs
-
         dlg = QFileDialog(QApplication.instance().mainWindow, 'Find VLC',
             self.lineEdit_VLC.text())
-        dlg.setNameFilters(['V*', '*'])
+        dlg.setNameFilters(['VLC files (V*, V*.exe)', 'All files (*, *.*)'])
         dlg.setFileMode(QFileDialog.ExistingFile)
         dlg.setFilter(QDir.Files | QDir.Executable)
 
@@ -615,17 +612,17 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
             and os.path.isfile(self.lineEdit_LogFilename.text()))
         self.pushButton_ClearLogFile.setEnabled(enabled)
 
-    def SetEnabledLogFilename(self, checked):
-        """ Enables lineEdit_LogFilename if either checkBox_LogHandBrakeAnalysis
-            or checkBox_LogHandBrakeTranscoding is checked.  Otherwise, it
-            disables it.
-        """
-
-        enabled = (self.checkBox_LogHandBrakeAnalysis.isChecked()
-            or self.checkBox_LogHandBrakeTranscoding.isChecked())
-
-        self.lineEdit_LogFilename.setEnabled(enabled)
-        self.pushButton_BrowseLogFile.setEnabled(enabled)
+    # def SetEnabledLogFilename(self, checked):
+    #     """ Enables lineEdit_LogFilename if either checkBox_LogHandBrakeAnalysis
+    #         or checkBox_LogHandBrakeTranscoding is checked.  Otherwise, it
+    #         disables it.
+    #     """
+    #
+    #     enabled = (self.checkBox_LogHandBrakeAnalysis.isChecked()
+    #         or self.checkBox_LogHandBrakeTranscoding.isChecked())
+    #
+    #     self.lineEdit_LogFilename.setEnabled(enabled)
+    #     self.pushButton_BrowseLogFile.setEnabled(enabled)
 
     def TransferFromWindow(self):
         """ Copy the data from the preferences object to the dialog widgets.
@@ -710,7 +707,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
 
         # Logging
         self.SetEnabledClearLog()
-        self.SetEnabledLogFilename(True)
+        # self.SetEnabledLogFilename(True)
 
         # Options
         self.lineEdit_ShortLastChapter.setEnabled(self.__preferences.options.checkImportShortChapter)

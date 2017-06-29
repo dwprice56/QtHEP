@@ -122,10 +122,9 @@ class Logging(object):
 
         log = SingletonLog()
 
-        if (self.analysis or self.commandsAndTimestamps):
-            if (self.filename):
-                log.open(self.filename)
-                return
+        if (self.filename):
+            log.open(self.filename)
+            return
 
         log.close()
 
@@ -922,7 +921,8 @@ class Presets(MutableSequence):
         return element
 
 class Mixdown(object):
-    """Store the information for a single audio mixdown"""
+    """ Store the information for a single audio mixdown.
+    """
 
     XMLNAME = 'Mixdown'
 
@@ -945,7 +945,8 @@ class Mixdown(object):
             self.sampleRate, self.bitrate, self.dynamicRangeCompression, self.gain)
 
     def clear(self):
-        """Set all object members to their initial values."""
+        """ Set all object members to their initial values.
+        """
 
         self.name = self.DEFAULT_NAME
         self.tag = self.DEFAULT_TAG
@@ -961,7 +962,8 @@ class Mixdown(object):
         return self.__parent
 
     def FromXML(self, element):
-        """Initialize the object from an XML element."""
+        """ Initialize the object from an XML element.
+        """
 
         self.name = XMLHelpers.GetXMLAttribute(element, 'Name', self.DEFAULT_NAME)
         self.tag  = XMLHelpers.GetXMLAttribute(element, 'Tag', self.DEFAULT_TAG)
@@ -973,14 +975,15 @@ class Mixdown(object):
         self.gain = XMLHelpers.GetXMLAttribute(element, 'Gain', self.DEFAULT_GAIN)
 
     def SetParent(self, parent):
-        """This should only be used by the Mixdowns class to update the objects parent."""
-
+        """ This should only be used by the Mixdowns class to update the objects parent.
+        """
         assert(isinstance(parent, Mixdowns))
 
         self.__parent = parent
 
     def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
+        """ Write the object to an XML file.
+        """
 
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
@@ -997,7 +1000,8 @@ class Mixdown(object):
         return element
 
 class Mixdowns(MutableSequence):
-    """A list of the available mixdowns."""
+    """ A list of the available mixdowns.
+    """
 
     XMLNAME = 'Mixdowns'
 
@@ -1048,8 +1052,8 @@ class Mixdowns(MutableSequence):
     # ==========================================================================
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         del self.mixdowns[:]
         self.mixdownsByName.clear()
 
@@ -1058,8 +1062,8 @@ class Mixdowns(MutableSequence):
         return self.__parent
 
     def FromXML(self, mixdownsElement):
-        """Initialize the object from an XML element."""
-
+        """ Initialize the object from an XML element.
+        """
         self.clear()
 
         for childNode in mixdownsElement.childNodes:
@@ -1072,21 +1076,18 @@ class Mixdowns(MutableSequence):
             self.SetDefaults()
 
     def GetByName(self, name):
-        """Returns the mixdown object for a name.
-           Returns None if the requested object doesn't exist."""
-
+        """ Returns the mixdown object for a name.
+            Returns None if the requested object doesn't exist.
+        """
         if (name in self.mixdownsByName.keys()):
             return self.mixdownsByName[name]
 
         return None
 
     def HasName(self, name):
-        """Returns true/false if a mixdown exists."""
-
-        if (name in self.mixdownsByName.keys()):
-            return True
-
-        return False
+        """ Returns true/false if a mixdown exists.
+        """
+        return (name in self.mixdownsByName.keys())
 
     def NewMixdown(self):
         """Create a new Mixdown object and initialize it to the first default."""
@@ -1096,8 +1097,8 @@ class Mixdowns(MutableSequence):
         return mixdown
 
     def SetDefaults(self):
-        """Set the default values."""
-
+        """ Set the default values.
+        """
         self.clear()
         for default in self.DEFAULT_MIXDOWNS:
             mixdown = Mixdown(self)
@@ -1105,8 +1106,8 @@ class Mixdowns(MutableSequence):
             self.append(mixdown)
 
     def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+        """ Write the object to an XML file.
+        """
         groupElement = doc.createElement(self.XMLNAME)
         parentElement.appendChild(groupElement)
 
@@ -1155,6 +1156,17 @@ class DiscSession(object):
     @property
     def parent(self):
         return self.__parent
+
+    def GetFullFilename(self, filename):
+        """ Return the disc session filename with the folde and/or prefix added.
+        """
+        if (self.autoDiscSessionsPrefix):
+            filename = self.autoDiscSessionsPrefix + filename
+
+        if (self.autoDiscSessionsFolder):
+            filename = os.path.join(self.autoDiscSessionsFolder, filename)
+
+        return filename
 
     def FromXML(self, element):
         """Initialize the object from an XML element."""
