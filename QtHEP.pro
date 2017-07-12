@@ -29,7 +29,8 @@ SOURCES += main.cpp\
 HEADERS  += mainwindow.h
 
 FORMS    += mainwindow.ui \
-    preferences.ui
+    preferences.ui \
+    filenametemplatesinfo.ui
 
 RESOURCES += \
     myresource.qrc

@@ -51,7 +51,7 @@ class CropWidgets(object):
         return self.__parent
 
     def setEnabled(self, enabled):
-        """ Enable/disable all of the audio track widgets.
+        """ Enable/disable all of the crop track widgets.
         """
         self.topWidget.setEnabled(enabled)
         self.bottomWidget.setEnabled(enabled)

@@ -18,6 +18,8 @@
 
 from collections import MutableSequence
 
+from PyQt5.QtWidgets import QApplication
+
 from AudioTrackStates import (AudioTrackState, AudioTrackStates)
 
 class AudioTrackWidgets(object):
@@ -77,7 +79,8 @@ class AudioTrackWidgets(object):
     def onSignal_trackWidget_currentTextChanged(self, text=None):
         """ Enable/disable the mixdown widgets, based on the track widget.
         """
-        enableMixdowns = (self.trackWidget.currentText() != '')
+        enableMixdowns = (self.trackWidget.isEnabled() and
+            bool(self.trackWidget.currentText()))
 
         self.primaryMixdownWidget.setEnabled(enableMixdowns)
         self.secondaryMixdownWidget.setEnabled(enableMixdowns)
@@ -162,6 +165,22 @@ class AudioTrackWidgetsList(MutableSequence):
         for trackWidgets in self.trackWidgetsList:
             trackWidgets.onSignal_trackWidget_currentTextChanged()
 
+    def audioTracks(self):
+        """ Return the selected audio tracks, with the associated mixdowns.
+        """
+        tracks = []
+
+        for trackWidgets in self.trackWidgetsList:
+            if (trackWidgets.trackWidget.currentText()):
+                mixdowns = []
+                if (trackWidgets.primaryMixdownWidget.currentText()):
+                    mixdowns.append(trackWidgets.primaryMixdownWidget.currentText())
+                if (trackWidgets.secondaryMixdownWidget.currentText()):
+                    mixdowns.append(trackWidgets.secondaryMixdownWidget.currentText())
+                tracks.append((trackWidgets.trackWidget.currentText(), mixdowns))
+
+        return tracks
+
     def setEnabled(self, enabled):
         """ Enable/disable all of the audio track widgets.
         """
@@ -187,15 +206,15 @@ class AudioTrackWidgetsList(MutableSequence):
         for idx in range(len(trackStates)):
             self.trackWidgetsList[idx].setWidgetsFromTrackState(trackStates[idx])
 
-    def Validate(self):
-        """ At least one track with at least one mixdown must be selected for
-            the audio track widgets to be valid.
-        """
-
-
-
-
-
-
-
-        return False
+    # def Validate(self):
+    #     """ At least one track with at least one mixdown must be selected for
+    #         the audio track widgets to be valid.
+    #     """
+    #
+    #
+    #
+    #
+    #
+    #
+    #
+    #     return False

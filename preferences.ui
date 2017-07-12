@@ -466,6 +466,20 @@
               </property>
              </spacer>
             </item>
+            <item>
+             <widget class="QToolButton" name="toolButton_FilenameTemplates_Info">
+              <property name="toolTip">
+               <string>Display the filename template substitution keys.,</string>
+              </property>
+              <property name="text">
+               <string>...</string>
+              </property>
+              <property name="icon">
+               <iconset>
+                <normaloff>images/information_16.png</normaloff>images/information_16.png</iconset>
+              </property>
+             </widget>
+            </item>
            </layout>
           </item>
          </layout>

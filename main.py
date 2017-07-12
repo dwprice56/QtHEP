@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os, os.path, sys
+import argparse, os, os.path, sys
 # import time
 
 sys.path.insert(0, '/home/dave/QtProjects/Helpers')
@@ -24,10 +24,15 @@ sys.path.insert(0, '/home/dave/QtProjects/DiscData')
 
 # from PyQt5.QtWidgets import QMainWindow, QApplication, QMessageBox, QTreeWidgetItem
 # from PyQt5.QtCore import QProcess
-from PyQt5.QtCore import QStandardPaths
-from PyQt5.QtWidgets import (QApplication,
+from PyQt5.QtCore import (
+    QSettings,
+    QStandardPaths
+)
+from PyQt5.QtWidgets import (
+    QApplication,
     QFileDialog,
-    QMessageBox)
+    QMessageBox
+)
 
 from  AppInit import __DEVELOPEMENT__
 
@@ -36,12 +41,14 @@ from Disc import (Disc,
     DiscFilenameTemplatesSingleton,
     DiscPresetsSingleton)
 from Preferences import Preferences
+from AudioTrackStates import DiscMixdownsSingleton
+from Preferences import Preferences
 from SingletonLog import SingletonLog
 from Titles import TitleVisibleSingleton
 
 class MyApplication(QApplication):
     def __init__(self, arguments):
-        super(MyApplication, self).__init__(arguments)
+        super().__init__(arguments)
 
         self.mainWindow = None
 
@@ -56,21 +63,19 @@ class MyApplication(QApplication):
 
         self.preferences = Preferences()
         if (os.path.exists(self.preferencesFilename)):
-            self.preferences.FromXML(self.preferencesFilename)
-            self.preferences.logging.InitLog()
+            self.preferences.fromXML(self.preferencesFilename)
+            self.preferences.logging.initializeLog()
         else:
-            self.preferences.ToXML(self.preferencesFilename)
+            self.preferences.toXML(self.preferencesFilename)
 
-        DiscFilenameTemplatesSingleton().Set(self.preferences.filenameTemplates)
-        DiscPresetsSingleton().Set(self.preferences.presets.GetNames())
+        DiscFilenameTemplatesSingleton().set(self.preferences.filenameTemplates)
+        DiscMixdownsSingleton().set(self.preferences.mixdowns.getMixdowns())
+        DiscPresetsSingleton().set(self.preferences.presets.getNames())
 
         self.disc = Disc(self)
 
-        TitleVisibleSingleton().Set(self.preferences.autoTitle.minimumTitleSeconds,
+        TitleVisibleSingleton().set(self.preferences.autoTitle.minimumTitleSeconds,
             self.disc.hideShortTitles)
-
-
-
 
 
 
@@ -92,42 +97,36 @@ class MyApplication(QApplication):
             self.temporarySessionFilename = os.path.join(self.standardPaths.GetUserDataDir(), "temp.{}".format(self.defaultSessionFilename))
         # 	self.logFilename = os.path.join(self.standardPaths.GetDocumentsDir(), "{}.log".format(APP_NAME))
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    @property
-    def hashSessionFilename(self):
-        """Return a session file name based on the disc hash value.
-
-        This is built from the file hash value, an optional user entered prefix and the standard file extension."""
-
-        return "{}.state.xml".format(self.disc.titles.GetHash())
-
-    def SavePreferences(self):
-        """Save the preferences to a file."""
-
-        self.preferences.ToXML(self.preferencesFilename)
+    def savePreferences(self):
+        """ Save the preferences to a file.
+        """
+        self.preferences.toXML(self.preferencesFilename)
         self.mainWindow.statusBar.showMessage('Preferences saved to "{}".'.format(self.preferencesFilename), 15000)
 
-def main():
+def main(useDefaultGeometry, useDefaultWindowState):
     app = MyApplication(sys.argv)
     app.mainWindow = MyMainWindow()
+
+    settings = QSettings()
+
+    if (not useDefaultGeometry):
+        geometry = settings.value('geometry')
+        if (geometry):
+            app.mainWindow.restoreGeometry(geometry)
+    if (not useDefaultWindowState):
+        windowState = settings.value('windowState')
+        if (windowState):
+            app.mainWindow.restoreState(windowState)
+
     app.mainWindow.show()
     app.exec_()
 
 if (__name__ == '__main__'):
-    main()
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument('-dg', '--dg', action='store_true', help="Use the default geometry.")
+    parser.add_argument('-ds', '--ds', action='store_true', help="Use the default window state.")
+
+    args = parser.parse_args()
+
+    main(args.dg, args.ds)

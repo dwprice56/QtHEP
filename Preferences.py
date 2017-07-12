@@ -48,8 +48,8 @@ class Executables(object):
             self.handBrakeCLI, self.VLC)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.handBrakeCLI = self.DEFAULT_CLI
         self.VLC = self.DEFAULT_VLC
 
@@ -57,9 +57,9 @@ class Executables(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.clear()
 
         # This attribute was renamed as part of the QT conversion.
@@ -68,9 +68,9 @@ class Executables(object):
 
         self.VLC = XMLHelpers.GetXMLAttribute(element, 'VLC', self.DEFAULT_VLC)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -80,8 +80,8 @@ class Executables(object):
         return element
 
 class Logging(object):
-    """Stores users information about log settings."""
-
+    """ Stores users information about log settings.
+    """
     XMLNAME = 'Logging'
 
     DEFAULT_ANALYSIS = False
@@ -97,8 +97,8 @@ class Logging(object):
             .format(self.XMLNAME, self.analysis, self.commandsAndTimestamps, self.filename)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.analysis = self.DEFAULT_ANALYSIS
         self.commandsAndTimestamps = self.DEFAULT_COMMANDS_AND_TIMESTAMPS
         self.filename = self.DEFAULT_FILENAME
@@ -107,19 +107,19 @@ class Logging(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.clear()
 
         self.analysis = XMLHelpers.GetXMLAttributeAsBool(element, 'Analysis', self.DEFAULT_ANALYSIS)
         self.commandsAndTimestamps = XMLHelpers.GetXMLAttributeAsBool(element, 'CommandsAndTimestamps', self.DEFAULT_COMMANDS_AND_TIMESTAMPS)
         self.filename = XMLHelpers.GetXMLAttribute(element, 'Filename', self.DEFAULT_FILENAME)
 
-    def InitLog(self):
-        """Open the log file, if the options require one.
-        The file will be created if it does not exist."""
-
+    def initializeLog(self):
+        """ Open the log file, if the options require one.
+            The file will be created if it does not exist.
+        """
         log = SingletonLog()
 
         if (self.filename):
@@ -128,9 +128,9 @@ class Logging(object):
 
         log.close()
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -141,8 +141,8 @@ class Logging(object):
         return element
 
 class Options(object):
-    """Stores the information about general option settings."""
-
+    """ Stores the information about general option settings.
+    """
     XMLNAME = 'Options'
 
     DEFAULT_NUMBER_CHAPTER_NAMES = False
@@ -162,8 +162,8 @@ class Options(object):
         self.checkImportShortChapter, self.textImportShortChapter)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.numberChapterNames = self.DEFAULT_NUMBER_CHAPTER_NAMES
         self.checkMp4Audio = self.DEFAULT_CHECK_MP4_AUDIO
         self.checkImportShortChapter = self.DEFAULT_CHECK_IMPORT_SHORT_CHAPTER
@@ -173,9 +173,9 @@ class Options(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.clear()
 
         self.numberChapterNames = XMLHelpers.GetXMLAttributeAsBool(element, 'NumberChapterNames', self.DEFAULT_NUMBER_CHAPTER_NAMES)
@@ -183,9 +183,9 @@ class Options(object):
         self.checkImportShortChapter = XMLHelpers.GetXMLAttributeAsBool(element, 'CheckImportShortChapter', self.DEFAULT_CHECK_IMPORT_SHORT_CHAPTER)
         self.textImportShortChapter = XMLHelpers.GetXMLAttribute(element, 'TextImportShortChapter', self.DEFAULT_TEXT_IMPORT_SHORT_CHAPTER)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -197,8 +197,8 @@ class Options(object):
         return element
 
 class FilenameTemplates(MutableSequence):
-    """A list of the templates used to generate a file name."""
-
+    """ A list of the templates used to generate a file name.
+    """
     XMLNAME = 'FilenameTemplates'
 
     TITLE_KEY                   = '<title>'
@@ -212,17 +212,18 @@ class FilenameTemplates(MutableSequence):
 
     DEFAULT_FILENAME_TEMPLATES = [
         '<title>.mkv',
+        '<title>.mp4',
+        '<eptitle>.mkv',
+        '<cetitle>.mkv',
+        '<title><epno> - <eptitle>.mkv',
+        '<title> - <eptitle>.mkv',
         '<title> [<preset>][<acodec>].mkv',
-        '<title> <eptitle> [<preset>][<acodec>].mkv',
-        '<title> <epno> - <eptitle> [<preset>][<acodec>].mkv',
-        '<title> <epno> - <cetitle> [<preset>][<acodec>].mkv',
-        '<title><epno> - <eptitle> [<preset>][<acodec>].mkv',
     ]
 
     @classmethod
-    def BuildFilename(cls, filenameTemplate, title, presetTag, audioTag, episodeNumber, episodeTitle, chapterEpisodeTitle):
-        """Build the file name using the preset values."""
-
+    def buildFilename(cls, filenameTemplate, title, presetTag, audioTag, episodeNumber, episodeTitle, chapterEpisodeTitle):
+        """ Build the file name using the preset values.
+        """
         filename = filenameTemplate
 
         filename = filename.replace(cls.TITLE_KEY,                  title)
@@ -233,26 +234,26 @@ class FilenameTemplates(MutableSequence):
         filename = filename.replace(cls.CHAPTER_RANGE_EPISODE_KEY,  chapterEpisodeTitle)
 
         # Flag that will cause all spaces with to be replaced with underscores
-        if (filename.find(cls.SPACES_TO_UNDERSCORE_FLAG) != -1):
+        if (cls.SPACES_TO_UNDERSCORE_FLAG in filenameTemplate):
             filename = filename.replace(cls.SPACES_TO_UNDERSCORE_FLAG, '')                    # remove the flag
             filename = filename.replace(' ', '_')
 
         return filename
 
     @classmethod
-    def HasTitleKey(cls, filenameTemplate):
+    def hasTitleKey(cls, filenameTemplate):
         return (cls.TITLE_KEY in filenameTemplate)
 
     @classmethod
-    def HasEpisodeTitleKey(cls, filenameTemplate):
+    def hasEpisodeTitleKey(cls, filenameTemplate):
         return (cls.EPISODE_TITLE_KEY in filenameTemplate)
 
     @classmethod
-    def HasChapterRangeEpisodeKey(cls, filenameTemplate):
+    def hasChapterRangeEpisodeKey(cls, filenameTemplate):
         return (cls.CHAPTER_RANGE_EPISODE_KEY in filenameTemplate)
 
     @classmethod
-    def IsMP4(cls, filenameTemplate):
+    def isMP4(cls, filenameTemplate):
         root, ext = os.path.splitext(filenameTemplate)
         return (ext.lower() == '.mp4')
 
@@ -261,7 +262,7 @@ class FilenameTemplates(MutableSequence):
 
         self.filenameTemplates = []
 
-        self.SetDefaults()
+        self.setDefaults()
 
     def __str__(self):
         return '{}:\n    {}\n'.format(self.XMLNAME,
@@ -286,17 +287,17 @@ class FilenameTemplates(MutableSequence):
     # ==========================================================================
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         del self.filenameTemplates[:]
 
     @property
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.clear()
 
         for childNode in element.childNodes:
@@ -304,24 +305,24 @@ class FilenameTemplates(MutableSequence):
                 if (childNode.hasAttribute('Value')):
                     self.filenameTemplates.append(XMLHelpers.GetXMLAttribute(childNode, 'Value'))
 
-        if (len(self.filenameTemplates) == 0):
-            self.SetDefaults()
+        if (not len(self.filenameTemplates)):
+            self.setDefaults()
 
-    def SetDefaults(self):
-        """Set the default values."""
-
+    def setDefaults(self):
+        """ Set the default values.
+        """
         self.clear()
         for default in self.DEFAULT_FILENAME_TEMPLATES:
             self.append(default)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         groupElement = doc.createElement(self.XMLNAME)
         parentElement.appendChild(groupElement)
 
         # These are "convenience" attributes for other applications that read the XML file.
-        # They are ignored by self.FromXML().
+        # They are ignored by self.fromXML().
         groupElement.setAttribute('count', str(len(self.filenameTemplates)))
 
         for filenameTemplate in self.filenameTemplates:
@@ -332,8 +333,8 @@ class FilenameTemplates(MutableSequence):
         return groupElement
 
 class NewSource(object):
-    """Actions to take when the source changes."""
-
+    """ Actions to take when the source changes.
+    """
     XMLNAME = 'NewSource'
 
     DEFAULT_FIRST_MASK = True
@@ -350,8 +351,8 @@ class NewSource(object):
             .format(self.XMLNAME, str(self.firstMask), str(self.firstPreset))
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.firstMask = self.DEFAULT_FIRST_MASK
         self.firstPreset = self.DEFAULT_FIRST_PRESET
 
@@ -362,18 +363,18 @@ class NewSource(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, newSourceElement):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, newSourceElement):
+        """ Initialize the object from an XML element.
+        """
         self.firstMask = XMLHelpers.GetXMLAttributeAsBool(newSourceElement, 'FirstMask', self.DEFAULT_FIRST_MASK)
         self.firstPreset = XMLHelpers.GetXMLAttributeAsBool(newSourceElement, 'FirstPreset', self.DEFAULT_FIRST_PRESET)
 
         self.useDefaultDestination = XMLHelpers.GetXMLAttributeAsBool(newSourceElement, 'UseDefaultDestination', self.DEFAULT_USE_DEFAULT_DESTINATION)
         self.defaultDestination = XMLHelpers.GetXMLAttribute(newSourceElement, 'DefaultDestination', self.DEFAULT_DEFAULT_DESTINATION)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -386,8 +387,8 @@ class NewSource(object):
         return element
 
 class FilenameReplacement(object):
-    """Options for replacing characters in a filename."""
-
+    """ Options for replacing characters in a filename.
+    """
     XMLNAME = 'FilenameReplacement'
 
     DEFAULT_REPLACE_FILENAME_CHARACTERS = False
@@ -405,8 +406,8 @@ class FilenameReplacement(object):
             self.replacementFilenameCharacter)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.replaceFilenameCharacters = self.DEFAULT_REPLACE_FILENAME_CHARACTERS
         self.filenameCharactersToReplace = self.DEFAULT_FILENAME_CHARACTERS_TO_REPLACE
         self.replacementFilenameCharacter = self.DEFAULT_REPLACEMENT_FILENAME_CHARACTER
@@ -415,16 +416,16 @@ class FilenameReplacement(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.replaceFilenameCharacters = XMLHelpers.GetXMLAttributeAsBool(element, 'ReplaceFilenameCharacters', self.DEFAULT_REPLACE_FILENAME_CHARACTERS)
         self.filenameCharactersToReplace = XMLHelpers.GetXMLAttribute(element, 'FilenameCharactersToReplace', self.DEFAULT_FILENAME_CHARACTERS_TO_REPLACE)
         self.replacementFilenameCharacter = XMLHelpers.GetXMLAttribute(element, 'ReplacementFilenameCharacter', self.DEFAULT_REPLACEMENT_FILENAME_CHARACTER)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -435,8 +436,8 @@ class FilenameReplacement(object):
         return element
 
 class AutoCrop(object):
-    """Stores information about the automatic cropping options."""
-
+    """ Stores information about the automatic cropping options.
+    """
     XMLNAME = 'AutoCrop'
 
     DEFAULT_AUTORESET_CROP = True
@@ -451,8 +452,8 @@ class AutoCrop(object):
             .format(self.XMLNAME, self.autoResetCrop, self.autoCopyCrop)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.autoResetCrop = self.DEFAULT_AUTORESET_CROP
         self.autoCopyCrop = self.DEFAULT_AUTOCOPY_CROP
 
@@ -460,15 +461,15 @@ class AutoCrop(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.autoResetCrop = XMLHelpers.GetXMLAttributeAsBool(element, 'AutoResetCrop', self.DEFAULT_AUTORESET_CROP)
         self.autoCopyCrop = XMLHelpers.GetXMLAttributeAsBool(element, 'AutoCopyCrop', self.DEFAULT_AUTOCOPY_CROP)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -478,8 +479,9 @@ class AutoCrop(object):
         return element
 
 class AutoTitle(object):
-    """Options that control the automatic title selection and which titles are displayed."""
-
+    """ Options that control the automatic title selection and which titles are
+        displayed.
+    """
     XMLNAME = 'AutoTitle'
 
     DEFAULT_AUTOSELECT_LONGEST_TITLE = True
@@ -494,8 +496,8 @@ class AutoTitle(object):
             .format(self.XMLNAME, self.autoSelectLongestTitle, self.minimumTitleSeconds)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.autoSelectLongestTitle = self.DEFAULT_AUTOSELECT_LONGEST_TITLE
         self.minimumTitleSeconds = self.DEFAULT_MINIMUM_TITLE_SECONDS
 
@@ -503,15 +505,15 @@ class AutoTitle(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.autoSelectLongestTitle = XMLHelpers.GetXMLAttributeAsBool(element, 'AutoSelectLongestTitle', self.DEFAULT_AUTOSELECT_LONGEST_TITLE)
         self.minimumTitleSeconds = XMLHelpers.GetXMLAttributeAsInt(element, 'MinimumTitleSeconds', self.DEFAULT_MINIMUM_TITLE_SECONDS)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -524,7 +526,6 @@ class AutoAudioTracks(object):
     """ Options that control the automatic selection of audio tracks when the
         source changes.
     """
-
     XMLNAME = 'AutoAudioTracks'
 
     DEFAULT_AUTOSELECT_PREFERRED_LANGUAGE = False
@@ -555,13 +556,16 @@ class AutoAudioTracks(object):
 
     @property
     def autoSelect(self):
-        return (self.autoSelect51 or self.autoSelectDTS or self.DEFAULT_AUTOSELECT_FALLBACK)
+        """ Return True if any of the autoselect attributes are true.
+        """
+        return (self.autoSelect51 or self.autoSelectDTS or
+            self.DEFAULT_AUTOSELECT_FALLBACK)
 
     @property
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
+    def fromXML(self, element):
         """ Initialize the object from an XML element.
         """
         self.autoSelectPreferredLanguage = XMLHelpers.GetXMLAttributeAsBool(element, 'AutoSelectPreferredLanguage', self.DEFAULT_AUTOSELECT_PREFERRED_LANGUAGE)
@@ -571,7 +575,7 @@ class AutoAudioTracks(object):
         self.autoSelectDTS = XMLHelpers.GetXMLAttributeAsBool(element, 'AutoSelectDTS', self.DEFAULT_AUTOSELECT_DTS)
         self.autoSelectFallback = XMLHelpers.GetXMLAttributeAsBool(element, 'AutoSelectFallback', self.DEFAULT_AUTOSELECT_FALLBACK)
 
-    def ToXML(self, doc, parentElement):
+    def toXML(self, doc, parentElement):
         """ Write the object to an XML file.
         """
         element = doc.createElement(self.XMLNAME)
@@ -587,8 +591,9 @@ class AutoAudioTracks(object):
         return element
 
 class AutoSubtitle(object):
-    """Options that control the automatic selection of subtitle tracks when the source changes."""
-
+    """ Options that control the automatic selection of subtitle tracks when
+        the source changes.
+    """
     XMLNAME = 'AutoSubtitle'
 
     DEFAULT_AUTOSELECT_PREFERRED_LANGUAGE = False
@@ -608,8 +613,8 @@ class AutoSubtitle(object):
             self.autoSelectSubtitle, self.subtitleBurn, self.subtitleDefault)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.autoSelectPreferredLanguage = self.DEFAULT_AUTOSELECT_PREFERRED_LANGUAGE
         self.preferredLanguage = self.DEFAULT_PREFERRED_LANGUAGE
 
@@ -621,9 +626,9 @@ class AutoSubtitle(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.autoSelectPreferredLanguage = XMLHelpers.GetXMLAttributeAsBool(element, 'AutoSelectPreferredLanguage', self.DEFAULT_AUTOSELECT_PREFERRED_LANGUAGE)
         self.preferredLanguage = XMLHelpers.GetXMLAttribute(element, 'PreferredLanguage', self.DEFAULT_PREFERRED_LANGUAGE)
 
@@ -631,9 +636,9 @@ class AutoSubtitle(object):
         self.subtitleBurn = XMLHelpers.GetXMLAttributeAsBool(element, 'SubtitleBurn', self.DEFAULT_SUBTITLE_BURN)
         self.subtitleDefault = XMLHelpers.GetXMLAttributeAsBool(element, 'SubtitleDefault', self.DEFAULT_SUBTITLE_DEFAULT)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -647,8 +652,9 @@ class AutoSubtitle(object):
         return element
 
 class AutoMixdown(object):
-    """Options that control the automatic selection of a mixdown for an audio track when the source changes."""
-
+    """ Options that control the automatic selection of a mixdown for an audio
+        track when the source changes.
+    """
     XMLNAME = 'AutoMixdown'
 
     DEFAULT_CHOICE = 'None'
@@ -671,8 +677,8 @@ class AutoMixdown(object):
             self.otherPrimary, self.otherSecondary)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.ac351Primary = self.DEFAULT_CHOICE
         self.ac351Secondary = self.DEFAULT_CHOICE
 
@@ -692,9 +698,9 @@ class AutoMixdown(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.ac351Primary = XMLHelpers.GetXMLAttribute(element, 'AC351Primary', self.DEFAULT_CHOICE)
         self.ac351Secondary = XMLHelpers.GetXMLAttribute(element, 'AC351Secondary', self.DEFAULT_CHOICE)
 
@@ -710,9 +716,9 @@ class AutoMixdown(object):
         self.otherPrimary = XMLHelpers.GetXMLAttribute(element, 'OtherPrimary', self.DEFAULT_CHOICE)
         self.otherSecondary = XMLHelpers.GetXMLAttribute(element, 'OtherSecondary', self.DEFAULT_CHOICE)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -734,8 +740,8 @@ class AutoMixdown(object):
         return element
 
 class Preset(object):
-    """Preset transcoding options for HandBrake."""
-
+    """ Preset transcoding options for HandBrake.
+    """
     XMLNAME = 'Preset'
 
     DEFAULT_NAME = ''
@@ -751,8 +757,8 @@ class Preset(object):
             .format(self.XMLNAME, self.name, self.tag, self.settings)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.name = self.DEFAULT_NAME
         self.tag = self.DEFAULT_TAG
         self.settings = self.DEFAULT_SETTINGS
@@ -766,7 +772,6 @@ class Preset(object):
         """ Returns the settings attribute with new lines (\n), carriage returns (\r),
             and multiple spaces stripped out.
         """
-
         s = self.settings.replace('\n', ' ')
         s = s.replace('\r', ' ')
         while ('  ' in s):
@@ -774,23 +779,24 @@ class Preset(object):
 
         return s
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.name = XMLHelpers.GetXMLAttribute(element, 'Name', self.DEFAULT_NAME)
         self.tag = XMLHelpers.GetXMLAttribute(element, 'Tag', self.DEFAULT_TAG)
         self.settings = XMLHelpers.GetXMLAttribute(element, 'Settings', self.DEFAULT_SETTINGS)
 
-    def SetParent(self, parent):
-        """This should only be used by the Mixdowns class to update the objects parent."""
-
+    def setParent(self, parent):
+        """ This should only be used by the Mixdowns class to update the objects
+            parent.
+        """
         assert(isinstance(parent, Presets))
 
         self.__parent = parent
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement('Preset')
         parentElement.appendChild(element)
 
@@ -801,8 +807,8 @@ class Preset(object):
         return element
 
 class Presets(MutableSequence):
-    """Preset transcoding options for HandBrake."""
-
+    """ Preset transcoding options for HandBrake.
+    """
     XMLNAME = 'Presets'
 
     DEFAULT_PRESETS = [
@@ -817,7 +823,7 @@ class Presets(MutableSequence):
         self.presets = []
         self.presetsByName = {}
 
-        self.SetDefaults()
+        self.setDefaults()
 
     def __str__(self):
         return '{}: len: {}'.format(self.XMLNAME, len(self.presets))
@@ -844,14 +850,14 @@ class Presets(MutableSequence):
     def insert(self, idx, obj):
         assert(isinstance(obj, Preset))
 
-        obj.SetParent(self)
+        obj.setParent(self)
         self.presets.insert(idx, obj)
         self.presetsByName[obj.name] = obj
     # ==========================================================================
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         del self.presets[:]
         self.presetsByName.clear()
 
@@ -859,71 +865,70 @@ class Presets(MutableSequence):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.clear()
 
         for childNode in element.childNodes:
             if (childNode.localName == Preset.XMLNAME):
 
                 preset = Preset(self)
-                preset.FromXML(childNode)
+                preset.fromXML(childNode)
                 self.append(preset)
 
-        if (len(self.presets) == 0):
-            self.SetDefaults()
+        if (not len(self.presets)):
+            self.setDefaults()
 
-    def GetByName(self, name):
-        """Return the preset with the given name."""
-
+    def getByName(self, name):
+        """ Return the preset with the given name.
+        """
         return self.presetsByName[name]
 
-    def GetNames(self):
-        """Returns a list of preset names."""
-
+    def getNames(self):
+        """ Returns a list of preset names.
+        """
         return self.presetsByName.keys()
 
-    def HasName(self, presetName):
-        """Returns true if the preset name is found."""
-
+    def hasName(self, presetName):
+        """ Returns true if the preset name is found.
+        """
         return (presetName in self.presetsByName.keys())
 
-    def NewPreset(self):
-        """Create a new Preset object and initialize it to the first default."""
-
+    def newPreset(self):
+        """ Create a new Preset object and initialize it to the first default.
+        """
         preset = Preset(self)
         preset.name, preset.tag, preset.settings = self.DEFAULT_PRESETS[0]
         return preset
 
-    def SetDefaults(self):
-        """Set the default values."""
-
+    def setDefaults(self):
+        """ Set the default values.
+        """
         self.clear()
         for default in self.DEFAULT_PRESETS:
             preset = Preset(self)
             preset.name, preset.tag, preset.settings = default
             self.append(preset)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
         # These are "convenience" attributes for other applications that read the XML file.
-        # They are ignored by self.FromXML().
+        # They are ignored by self.fromXML().
         element.setAttribute('count', str(len(self.presets)))
 
         for preset in self.presets:
-            preset.ToXML(doc, element)
+            preset.toXML(doc, element)
 
         return element
 
 class Mixdown(object):
     """ Store the information for a single audio mixdown.
     """
-
     XMLNAME = 'Mixdown'
 
     DEFAULT_NAME = ''
@@ -947,7 +952,6 @@ class Mixdown(object):
     def clear(self):
         """ Set all object members to their initial values.
         """
-
         self.name = self.DEFAULT_NAME
         self.tag = self.DEFAULT_TAG
         self.encoder = self.DEFAULT_ENCODER
@@ -961,10 +965,9 @@ class Mixdown(object):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, element):
+    def fromXML(self, element):
         """ Initialize the object from an XML element.
         """
-
         self.name = XMLHelpers.GetXMLAttribute(element, 'Name', self.DEFAULT_NAME)
         self.tag  = XMLHelpers.GetXMLAttribute(element, 'Tag', self.DEFAULT_TAG)
         self.encoder = XMLHelpers.GetXMLAttribute(element, 'Encoder', self.DEFAULT_ENCODER)
@@ -974,17 +977,16 @@ class Mixdown(object):
         self.dynamicRangeCompression = XMLHelpers.GetXMLAttribute(element, 'DRC', self.DEFAULT_DYNAMIC_RANGE_COMPRESSION)
         self.gain = XMLHelpers.GetXMLAttribute(element, 'Gain', self.DEFAULT_GAIN)
 
-    def SetParent(self, parent):
+    def setParent(self, parent):
         """ This should only be used by the Mixdowns class to update the objects parent.
         """
         assert(isinstance(parent, Mixdowns))
 
         self.__parent = parent
 
-    def ToXML(self, doc, parentElement):
+    def toXML(self, doc, parentElement):
         """ Write the object to an XML file.
         """
-
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -1002,7 +1004,6 @@ class Mixdown(object):
 class Mixdowns(MutableSequence):
     """ A list of the available mixdowns.
     """
-
     XMLNAME = 'Mixdowns'
 
     DEFAULT_MIXDOWNS = [
@@ -1019,7 +1020,7 @@ class Mixdowns(MutableSequence):
         self.mixdowns = []
         self.mixdownsByName = {}
 
-        self.SetDefaults()
+        self.setDefaults()
 
     def __str__(self):
         return '{}: len: {}'.format(self.XMLNAME, len(self.mixdowns))
@@ -1046,7 +1047,7 @@ class Mixdowns(MutableSequence):
     def insert(self, idx, obj):
         assert(isinstance(obj, Mixdown))
 
-        obj.SetParent(self)
+        obj.setParent(self)
         self.mixdowns.insert(idx, obj)
         self.mixdownsByName[obj.name] = obj
     # ==========================================================================
@@ -1061,7 +1062,7 @@ class Mixdowns(MutableSequence):
     def parent(self):
         return self.__parent
 
-    def FromXML(self, mixdownsElement):
+    def fromXML(self, mixdownsElement):
         """ Initialize the object from an XML element.
         """
         self.clear()
@@ -1069,13 +1070,13 @@ class Mixdowns(MutableSequence):
         for childNode in mixdownsElement.childNodes:
             if (childNode.localName == Mixdown.XMLNAME):
                 mixdown = Mixdown(self)
-                mixdown.FromXML(childNode)
+                mixdown.fromXML(childNode)
                 self.append(mixdown)
 
-        if (len(self.mixdowns) == 0):
-            self.SetDefaults()
+        if (not len(self.mixdowns)):
+            self.setDefaults()
 
-    def GetByName(self, name):
+    def getByName(self, name):
         """ Returns the mixdown object for a name.
             Returns None if the requested object doesn't exist.
         """
@@ -1084,19 +1085,28 @@ class Mixdowns(MutableSequence):
 
         return None
 
-    def HasName(self, name):
+    def getMixdowns(self):
+        """ Returns a list of mixdowns.
+        """
+        return self.mixdownsByName.keys()
+
+    def hasName(self, name):
         """ Returns true/false if a mixdown exists.
         """
         return (name in self.mixdownsByName.keys())
 
-    def NewMixdown(self):
-        """Create a new Mixdown object and initialize it to the first default."""
-
+    def newMixdown(self):
+        """ Create a new Mixdown object and initialize it to the first default.
+        """
         mixdown = Mixdown(self)
-        mixdown.name, mixdown.tag, mixdown.encoder, mixdown.mixdown, mixdown.sampleRate, mixdown.bitrate, mixdown.dynamicRangeCompression, mixdown.gain = self.DEFAULT_MIXDOWNS[0]
+
+        mixdown.name, mixdown.tag, mixdown.encoder, mixdown.mixdown,
+        mixdown.sampleRate, mixdown.bitrate, mixdown.dynamicRangeCompression,
+        mixdown.gain = self.DEFAULT_MIXDOWNS[0]
+
         return mixdown
 
-    def SetDefaults(self):
+    def setDefaults(self):
         """ Set the default values.
         """
         self.clear()
@@ -1105,24 +1115,24 @@ class Mixdowns(MutableSequence):
             mixdown.name, mixdown.tag, mixdown.encoder, mixdown.mixdown, mixdown.sampleRate, mixdown.bitrate, mixdown.dynamicRangeCompression, mixdown.gain = default
             self.append(mixdown)
 
-    def ToXML(self, doc, parentElement):
+    def toXML(self, doc, parentElement):
         """ Write the object to an XML file.
         """
         groupElement = doc.createElement(self.XMLNAME)
         parentElement.appendChild(groupElement)
 
         # These are "convenience" attributes for other applications that read the XML file.
-        # They are ignored by self.FromXML().
+        # They are ignored by self.fromXML().
         groupElement.setAttribute('count', str(len(self.mixdowns)))
 
         for mixdown in self.mixdowns:
-            mixdown.ToXML(doc, groupElement)
+            mixdown.toXML(doc, groupElement)
 
         return groupElement
 
 class DiscSession(object):
-    """Stores information about disc session settings."""
-
+    """ Stores information about disc session settings.
+    """
     XMLNAME = 'DiscSession'
 
     DEFAULT_AUTO_DISC_SESSIONS = False
@@ -1143,8 +1153,8 @@ class DiscSession(object):
             self.autoDiscSessionsPrefix, self.keepPosition, self.keepSize, self.keepDestination)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.autoDiscSessions = self.DEFAULT_AUTO_DISC_SESSIONS
         self.autoDiscSessionsFolder = self.DEFAULT_AUTO_DISC_SESSIONS_FOLDER
         self.autoDiscSessionsPrefix = self.DEFAULT_AUTO_DISC_SESSIONS_PREFIX
@@ -1157,7 +1167,7 @@ class DiscSession(object):
     def parent(self):
         return self.__parent
 
-    def GetFullFilename(self, filename):
+    def getFullFilename(self, filename):
         """ Return the disc session filename with the folde and/or prefix added.
         """
         if (self.autoDiscSessionsPrefix):
@@ -1168,9 +1178,9 @@ class DiscSession(object):
 
         return filename
 
-    def FromXML(self, element):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, element):
+        """ Initialize the object from an XML element.
+        """
         self.autoDiscSessions = XMLHelpers.GetXMLAttributeAsBool(element, 'AutoDiscSessions', self.DEFAULT_AUTO_DISC_SESSIONS)
         self.autoDiscSessionsFolder = XMLHelpers.GetXMLAttribute(element, 'AutoDiscSessionsFolder', self.DEFAULT_AUTO_DISC_SESSIONS_FOLDER)
         self.autoDiscSessionsPrefix = XMLHelpers.GetXMLAttribute(element, 'AutoDiscSessionsPrefix', self.DEFAULT_AUTO_DISC_SESSIONS_PREFIX)
@@ -1179,9 +1189,9 @@ class DiscSession(object):
         self.keepSize = XMLHelpers.GetXMLAttributeAsBool(element, 'KeepSize', self.DEFAULT_KEEP_SIZE)
         self.keepDestination = XMLHelpers.GetXMLAttributeAsBool(element, 'KeepDestination', self.DEFAULT_KEEP_DESTINATION)
 
-    def ToXML(self, doc, parentElement):
-        """Write the object to an XML file."""
-
+    def toXML(self, doc, parentElement):
+        """ Write the object to an XML file.
+        """
         element = doc.createElement(self.XMLNAME)
         parentElement.appendChild(element)
 
@@ -1196,9 +1206,9 @@ class DiscSession(object):
         return element
 
 class Preferences(object):
-    """General settings for QtHEP."""
-
-    XMLNAME = 'Preferences'        # For this class, and only this class, this is not actually used by FromXML(), ToXML()
+    """ General settings for QtHEP.
+    """
+    XMLNAME = 'Preferences'        # For this class, and only this class, this is not actually used by fromXML(), toXML()
 
     def __init__(self):
 
@@ -1229,8 +1239,8 @@ class Preferences(object):
             self.mixdowns, self.discSession)
 
     def clear(self):
-        """Set all object members to their initial values."""
-
+        """ Set all object members to their initial values.
+        """
         self.executables.clear()
         self.logging.clear()
         self.options.clear()
@@ -1250,97 +1260,98 @@ class Preferences(object):
 
         self.discSession.clear()
 
-    def FromXML(self, filename):
-        """Initialize the object from an XML element."""
-
+    def fromXML(self, filename):
+        """ Initialize the object from an XML element.
+        """
         self.clear()
 
         doc = minidom.parse(filename)
         # The node name changed as part of the QT conversion.
         if (doc.documentElement.nodeName not in ['QtHEP', 'wxHEP']):
-            raise RuntimeError('Can''t read file "{}" because the "QtHEP" element is missing or misplaced!'.format(filename))
+            raise RuntimeError(('Can''t read file "{}" because the "QtHEP" '
+            'element is missing or misplaced!').format(filename))
 
         for childNode in doc.documentElement.childNodes:
             if (childNode.localName == Executables.XMLNAME):
-                self.executables.FromXML(childNode)
+                self.executables.fromXML(childNode)
                 continue
             if (childNode.localName == Logging.XMLNAME):
-                self.logging.FromXML(childNode)
+                self.logging.fromXML(childNode)
                 continue
             if (childNode.localName == Options.XMLNAME):
-                self.options.FromXML(childNode)
+                self.options.fromXML(childNode)
                 continue
             if (childNode.localName == NewSource.XMLNAME):
-                self.newSource.FromXML(childNode)
+                self.newSource.fromXML(childNode)
                 continue
 
             if (childNode.localName == FilenameTemplates.XMLNAME):
-                self.filenameTemplates.FromXML(childNode)
+                self.filenameTemplates.fromXML(childNode)
                 continue
             if (childNode.localName == FilenameReplacement.XMLNAME):
-                self.filenameReplacement.FromXML(childNode)
+                self.filenameReplacement.fromXML(childNode)
                 continue
 
             if (childNode.localName == AutoCrop.XMLNAME):
-                self.autoCrop.FromXML(childNode)
+                self.autoCrop.fromXML(childNode)
                 continue
             if (childNode.localName == AutoTitle.XMLNAME):
-                self.autoTitle.FromXML(childNode)
+                self.autoTitle.fromXML(childNode)
                 continue
             if (childNode.localName == AutoAudioTracks.XMLNAME):
-                self.autoAudioTracks.FromXML(childNode)
+                self.autoAudioTracks.fromXML(childNode)
                 continue
             if (childNode.localName == AutoSubtitle.XMLNAME):
-                self.autoSubtitle.FromXML(childNode)
+                self.autoSubtitle.fromXML(childNode)
                 continue
             if (childNode.localName == AutoMixdown.XMLNAME):
-                self.autoMixdown.FromXML(childNode)
+                self.autoMixdown.fromXML(childNode)
                 continue
 
             if (childNode.localName == Presets.XMLNAME):
-                self.presets.FromXML(childNode)
+                self.presets.fromXML(childNode)
                 continue
             if (childNode.localName == Mixdowns.XMLNAME):
-                self.mixdowns.FromXML(childNode)
+                self.mixdowns.fromXML(childNode)
                 continue
 
             if (childNode.localName == DiscSession.XMLNAME):
-                self.discSession.FromXML(childNode)
+                self.discSession.fromXML(childNode)
 
         doc.unlink()
 
-        if (len(self.filenameTemplates) == 0):
-            self.filenameTemplates.SetDefaults()
-        if (len(self.presets) == 0):
-            self.presets.SetDefaults()
-        if (len(self.mixdowns) == 0):
-            self.mixdowns.SetDefaults()
+        if (not len(self.filenameTemplates)):
+            self.filenameTemplates.setDefaults()
+        if (not len(self.presets)):
+            self.presets.setDefaults()
+        if (not len(self.mixdowns)):
+            self.mixdowns.setDefaults()
 
-    def ToXML(self, filename):
-        """Write the settings to an XML file."""
-
+    def toXML(self, filename):
+        """ Write the settings to an XML file.
+        """
         dom = minidom.getDOMImplementation()
         doc = dom.createDocument(None, 'QtHEP', None)
         parentElement = doc.documentElement
 
-        self.executables.ToXML(doc, parentElement)
-        self.logging.ToXML(doc, parentElement)
-        self.options.ToXML(doc, parentElement)
-        self.newSource.ToXML(doc, parentElement)
+        self.executables.toXML(doc, parentElement)
+        self.logging.toXML(doc, parentElement)
+        self.options.toXML(doc, parentElement)
+        self.newSource.toXML(doc, parentElement)
 
-        self.filenameTemplates.ToXML(doc, parentElement)
-        self.filenameReplacement.ToXML(doc, parentElement)
+        self.filenameTemplates.toXML(doc, parentElement)
+        self.filenameReplacement.toXML(doc, parentElement)
 
-        self.autoCrop.ToXML(doc, parentElement)
-        self.autoTitle.ToXML(doc, parentElement)
-        self.autoAudioTracks.ToXML(doc, parentElement)
-        self.autoSubtitle.ToXML(doc, parentElement)
-        self.autoMixdown.ToXML(doc, parentElement)
+        self.autoCrop.toXML(doc, parentElement)
+        self.autoTitle.toXML(doc, parentElement)
+        self.autoAudioTracks.toXML(doc, parentElement)
+        self.autoSubtitle.toXML(doc, parentElement)
+        self.autoMixdown.toXML(doc, parentElement)
 
-        self.presets.ToXML(doc, parentElement)
-        self.mixdowns.ToXML(doc, parentElement)
+        self.presets.toXML(doc, parentElement)
+        self.mixdowns.toXML(doc, parentElement)
 
-        self.discSession.ToXML(doc, parentElement)
+        self.discSession.toXML(doc, parentElement)
 
         xmlFile = open(filename, 'w')
         doc.writexml(xmlFile, '', '\t', '\n')
@@ -1348,10 +1359,11 @@ class Preferences(object):
 
         doc.unlink()
 
-    def BuildFilename(self, filenameTemplate, title, presetTag, audioTag, episodeNumber, episodeTitle, chapterEpisodeTitle):
-        """Build the file name using the preset values."""
-
-        filename = FilenameTemplates.BuildFilename(filenameTemplate, title, presetTag,
+    def buildFilename(self, filenameTemplate, title, presetTag, audioTag,
+        episodeNumber, episodeTitle, chapterEpisodeTitle):
+        """ Build the file name using the preset values.
+        """
+        filename = FilenameTemplates.buildFilename(filenameTemplate, title, presetTag,
             audioTag, episodeNumber, episodeTitle, chapterEpisodeTitle)
 
         if (self.filenameReplacement.replaceFilenameCharacters):
@@ -1366,7 +1378,7 @@ if __name__ == '__main__':
 
     preferences = Preferences()
     if (os.path.exists('QtHEP.defaults.xml')):
-        preferences.FromXML('QtHEP.defaults.xml')
+        preferences.fromXML('QtHEP.defaults.xml')
         print ("Defaults file read.")
 
     print ()
@@ -1401,26 +1413,26 @@ if __name__ == '__main__':
         '<$_><title>.mkv']
 
 
-    print (FilenameTemplates.HasTitleKey('<title>.mkv'))
-    print (FilenameTemplates.HasTitleKey('<eptitle>.mkv'))
+    print (FilenameTemplates.hasTitleKey('<title>.mkv'))
+    print (FilenameTemplates.hasTitleKey('<eptitle>.mkv'))
 
     print ()
     print ()
 
     for testTemplate in testTemplates:
-        print (FilenameTemplates.BuildFilename(testTemplate, 'Buffy the Vampire Slayer 1', 'Film', 'DPL2,AC3', '12', 'Prophecy Girl', 'chapter'))
+        print (FilenameTemplates.buildFilename(testTemplate, 'Buffy the Vampire Slayer 1', 'Film', 'DPL2,AC3', '12', 'Prophecy Girl', 'chapter'))
 
     print ()
     print ()
 
     for testTemplate in testTemplates:
-        print (preferences.BuildFilename(testTemplate, 'Buffy the Vampire Slayer 1', 'Film', 'DPL2,AC3', '12', 'Prophecy Girl', 'chapter'))
+        print (preferences.buildFilename(testTemplate, 'Buffy the Vampire Slayer 1', 'Film', 'DPL2,AC3', '12', 'Prophecy Girl', 'chapter'))
 
     print ()
     print ()
 
     preferences.filenameReplacement.replaceFilenameCharacters = True
     for testTemplate in testTemplates:
-        print (preferences.BuildFilename(testTemplate, 'Buffy the Vampire Slayer 1', 'Film', 'DPL2,AC3', '12', 'Prophecy Girl', 'chapter'))
+        print (preferences.buildFilename(testTemplate, 'Buffy the Vampire Slayer 1', 'Film', 'DPL2,AC3', '12', 'Prophecy Girl', 'chapter'))
 
-    preferences.ToXML('TestFiles/QtHEP.defaults.xml')
+    preferences.toXML('TestFiles/QtHEP.defaults.xml')

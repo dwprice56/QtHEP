@@ -65,7 +65,8 @@ class SubtitleTrackWidgets(object):
     def onSignal_trackWidget_currentTextChanged(self, text=None):
         """ Enable/disable the mixdown widgets, based on the track widget.
         """
-        enableCheckBoxes = (self.trackWidget.currentText() != '')
+        enableCheckBoxes = (self.trackWidget.isEnabled() and
+            bool(self.trackWidget.currentText()))
 
         self.forcedWidget.setEnabled(enableCheckBoxes)
         self.burnWidget.setEnabled(enableCheckBoxes)
@@ -112,7 +113,7 @@ class SubtitleTrackWidgets(object):
             if (self.defaultWidget.isChecked()):
                 self.defaultWidget.setChecked(False)
 
-            self.parent.CheckBox_stateChanged(state, self.index)
+            self.parent.checkBox_stateChanged(state, self.index)
 
     def onCheckBox_stateChanged_Default(self, state):
         """ The default checkbox was checked/unchecked.
@@ -126,7 +127,7 @@ class SubtitleTrackWidgets(object):
             if (self.burnWidget.isChecked()):
                 self.burnWidget.setChecked(False)
 
-            self.parent.CheckBox_stateChanged(state, self.index)
+            self.parent.checkBox_stateChanged(state, self.index)
 
 class SubtitleTrackWidgetsList(MutableSequence):
     """ Container for a list of SubtitleTrackWidgets.
@@ -214,7 +215,7 @@ class SubtitleTrackWidgetsList(MutableSequence):
         for idx in range(len(trackStates)):
             self.trackWidgetsList[idx].setWidgetsFromTrackState(trackStates[idx])
 
-    def CheckBox_stateChanged(self, state, index):
+    def checkBox_stateChanged(self, state, index):
         """ A burn or default checkbox was checked/unchecked.
 
             The 'state' variable is True/False unless this is a tri-state checkbox.

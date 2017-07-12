@@ -49,10 +49,7 @@ from PyQt5.QtWidgets import (QApplication,
     QMessageBox)
 
 from preferencesui import Ui_DialogPreferences
-
-# TODO add set defaults button
-# TODO update combo boxes when mixdowns change
-# TODO update parent combo boxes when dialog closes
+from filenametemplatesinfoui import Ui_DialogFilenameTemplatesInfo
 
 class LogFile_Validator(QLineEditor_Abstract_Validator):
     """ A validator for a QLineEdit field that contains a file.
@@ -63,7 +60,7 @@ class LogFile_Validator(QLineEditor_Abstract_Validator):
     __DEFAULT_MESSAGE = 'The Log File field is either blank or does not point to a valid file.'
 
     def __init__(self, widget, title=VALIDATORS_DEFAULT_TITLE, message=__DEFAULT_MESSAGE):
-        super(LogFile_Validator, self).__init__(widget, title, message)
+        super().__init__(widget, title, message)
 
     def isValid(self):
         """ Validate the name of the log file.
@@ -113,10 +110,8 @@ class LogFile_Validator(QLineEditor_Abstract_Validator):
 class PreferencesDialog(QDialog, Ui_DialogPreferences):
     """ The dialog used to edit the application preferences."""
 
-    # PROBLEM_BACKGROUND_STYLE = 'background-color: rgb(252, 175, 62);'
-
     def __init__(self, preferences, parent=None):
-        super(PreferencesDialog, self).__init__(parent)
+        super().__init__(parent)
         self.setupUi(self)
 
         self.__preferences = preferences
@@ -293,6 +288,8 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
             self.__preferences.filenameTemplates.DEFAULT_FILENAME_TEMPLATES[0]
         )
 
+        self.toolButton_FilenameTemplates_Info.clicked.connect(self.onButton_FilenameTemplates_Info)
+
         # Connect the widgets to the data items.
         # ======================================================================
 
@@ -330,7 +327,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
 
         # self.checkBox_LogHandBrakeAnalysis.toggled.connect(self.SetEnabledLogFilename)
         # self.checkBox_LogHandBrakeTranscoding.toggled.connect(self.SetEnabledLogFilename)
-        self.lineEdit_LogFilename.textChanged.connect(self.SetEnabledClearLog)
+        self.lineEdit_LogFilename.textChanged.connect(self.setEnabledClearLog)
 
         self.pushButton_BrowseDefaultDestination.clicked.connect(self.onBrowseDefaultDestinationFolder)
 
@@ -400,6 +397,8 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
         # Connect the widgets to the data items.
         # ======================================================================
         self.listWidget_Mixdowns.currentItemChanged.connect(self.onMixdownListWidgetCurrentItemChanged)
+        self.listWidget_Mixdowns.itemChanged.connect(self.onMixdownListWidgetItemChanged)
+        self.mixdownsOrderedEditableList.listChanged.connect(self.onMixdownListChanged)
 
         # Create the validators.
         # ======================================================================
@@ -436,10 +435,10 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
             message = 'The Presets list may not be blank.')
 
     def accept(self):
-        if (self.Validate()):
-            super(PreferencesDialog, self).accept()
+        if (self.validate()):
+            super().accept()
 
-    def LoadAutoMixdownComboBoxes(self):
+    def loadAutoMixdownComboBoxes(self):
         """ The Auto Mixdown combo boxes must be loaded from the mixdown list
             box to pick up any changes to the mixdown list before the preferences
             dialog is closed.  That means the mixdown list box must be loaded
@@ -536,6 +535,15 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
 
         del dlg
 
+    def onButton_FilenameTemplates_Info(self):
+        """ Display the filename templates information dialog.
+        """
+        dlg = QDialog(self)
+        ui = Ui_DialogFilenameTemplatesInfo()
+        ui.setupUi(dlg)
+        dlg.setAttribute(Qt.WA_DeleteOnClose)
+        dlg.show()
+
     def onClearLogFile(self):
         """ Clear the log file.
         """
@@ -570,12 +578,24 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
             self.lineEdit_MixdownDynamicRangeCompression.setText(mixdown.dynamicRangeCompression)
             self.lineEdit_MixdownGain.setText(mixdown.gain)
 
+    def onMixdownListWidgetItemChanged(self, item):
+        """ The detail fields for a mixdown list item must be updated whenever
+            the item selection changes.
+        """
+        self.loadAutoMixdownComboBoxes()
+
+    def onMixdownListChanged(self):
+        """ The detail fields for a mixdown list item must be updated whenever
+            the item selection changes.
+        """
+        self.loadAutoMixdownComboBoxes()
+
     def onNewMixdownListItem(self, item, name):
         """ Add a new Mixdown() object to item.data() to complete the item
             initialization.
         """
 
-        mixdown = self.__preferences.mixdowns.NewMixdown()
+        mixdown = self.__preferences.mixdowns.newMixdown()
         mixdown.name = name
         item.setData(Qt.UserRole, mixdown)
 
@@ -584,7 +604,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
             initialization.
         """
 
-        preset = self.__preferences.presets.NewPreset()
+        preset = self.__preferences.presets.newPreset()
         preset.name = name
         item.setData(Qt.UserRole, preset)
 
@@ -603,7 +623,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
             self.lineEdit_PresetTag.setText(preset.tag)
             self.plainTextEdit_PresetSettings.setPlainText(preset.settings)
 
-    def SetEnabledClearLog(self):
+    def setEnabledClearLog(self):
         """ Enable pushButton_ClearLogFile if the log file exists, otherwise
             disable it.
         """
@@ -624,7 +644,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
     #     self.lineEdit_LogFilename.setEnabled(enabled)
     #     self.pushButton_BrowseLogFile.setEnabled(enabled)
 
-    def TransferFromWindow(self):
+    def transferFromWindow(self):
         """ Copy the data from the preferences object to the dialog widgets.
         """
 
@@ -672,7 +692,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
             preset.name = item.text()
             self.__preferences.presets.append(preset)
 
-    def TransferToWindow(self):
+    def transferToWindow(self):
         """ Copy the data from the preferences object to the dialog widgets.
         """
 
@@ -680,24 +700,24 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
         for filenameTemplate in self.__preferences.filenameTemplates:
             item = QListWidgetItem(filenameTemplate, self.listWidget_FilenameTemplates)
             item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
-        self.filenameTemplatesOrderedEditableList.EnableButtons()
+        self.filenameTemplatesOrderedEditableList.enableButtons()
 
         # Mixdowns
         for mixdown in self.__preferences.mixdowns:
             item = QListWidgetItem(mixdown.name, self.listWidget_Mixdowns)
             item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
             item.setData(Qt.UserRole, copy.deepcopy(mixdown))
-        self.mixdownsOrderedEditableList.EnableButtons()
+        self.mixdownsOrderedEditableList.enableButtons()
 
         # Presets
         for preset in self.__preferences.presets:
             item = QListWidgetItem(preset.name, self.listWidget_Presets)
             item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
             item.setData(Qt.UserRole, copy.deepcopy(preset))
-        self.presetsOrderedEditableList.EnableButtons()
+        self.presetsOrderedEditableList.enableButtons()
 
         # Auto Audio Mixdowns
-        self.LoadAutoMixdownComboBoxes()
+        self.loadAutoMixdownComboBoxes()
 
         self.__widgetDataConnectors.transferToWidgets()
 
@@ -706,7 +726,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
         self.pushButton_BrowseDefaultDestination.setEnabled(self.__preferences.newSource.useDefaultDestination)
 
         # Logging
-        self.SetEnabledClearLog()
+        self.setEnabledClearLog()
         # self.SetEnabledLogFilename(True)
 
         # Options
@@ -726,7 +746,7 @@ class PreferencesDialog(QDialog, Ui_DialogPreferences):
         # Auto Subtitle Track(s)
         self.lineEdit_AutoSubtitlePreferredLanguage.setEnabled(self.__preferences.autoSubtitle.autoSelectPreferredLanguage)
 
-    def Validate(self):
+    def validate(self):
         """ Validate the contents of the dialog widgets.  Returns False if any of the
             widgets are invalid.  Otherwise, returns True.
         """

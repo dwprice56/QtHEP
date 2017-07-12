@@ -79,6 +79,9 @@
              <property name="toolTip">
               <string>A folder containing the video source.</string>
              </property>
+             <property name="clearButtonEnabled">
+              <bool>true</bool>
+             </property>
             </widget>
            </item>
            <item row="0" column="2">
@@ -255,6 +258,9 @@
             <widget class="QLineEdit" name="lineEdit_Disc_Destination">
              <property name="toolTip">
               <string>A folder where the transcoded files wil be stored.</string>
+             </property>
+             <property name="clearButtonEnabled">
+              <bool>true</bool>
              </property>
             </widget>
            </item>
@@ -1789,7 +1795,7 @@
                </attribute>
                <layout class="QGridLayout" name="gridLayout">
                 <item row="0" column="0" rowspan="2">
-                 <widget class="QTableWidget" name="tableWidget_Disc_Title">
+                 <widget class="QTableWidget" name="tableWidget_DiscTitle_Title">
                   <property name="maximumSize">
                    <size>
                     <width>175</width>
@@ -2113,16 +2119,17 @@
                  </widget>
                 </item>
                 <item row="2" column="0">
-                 <widget class="QTableWidget" name="tableWidget_Disc_Chapters">
+                 <widget class="QTableWidget" name="tableWidget_DiscTitle_Chapters">
                   <property name="selectionBehavior">
                    <enum>QAbstractItemView::SelectRows</enum>
                   </property>
                   <property name="columnCount">
-                   <number>4</number>
+                   <number>5</number>
                   </property>
                   <attribute name="verticalHeaderVisible">
                    <bool>false</bool>
                   </attribute>
+                  <column/>
                   <column/>
                   <column/>
                   <column/>
@@ -3529,6 +3536,7 @@
     <addaction name="actionDelete_Hash_Session"/>
     <addaction name="separator"/>
     <addaction name="actionOpen_Session"/>
+    <addaction name="actionOpen_Hash_Session"/>
     <addaction name="menuOpen_Recent"/>
     <addaction name="separator"/>
     <addaction name="actionPreferences"/>
@@ -3649,6 +3657,11 @@
   <action name="action_LogFile_Open">
    <property name="text">
     <string>Open log file</string>
+   </property>
+  </action>
+  <action name="actionOpen_Hash_Session">
+   <property name="text">
+    <string>Open Hash Session</string>
    </property>
   </action>
  </widget>
