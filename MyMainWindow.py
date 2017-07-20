@@ -16,10 +16,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import os.path, pathlib, subprocess, sys, xml.dom, xml.dom.minidom as minidom
+import datetime, os, os.path, pathlib, subprocess, sys, tempfile, xml.dom, xml.dom.minidom as minidom
 
 # import time
-from collections import namedtuple
+from collections import (
+    deque,
+    namedtuple
+)
 
 sys.path.insert(0, '/home/dave/QtProjects/Helpers')
 sys.path.insert(0, '/home/dave/QtProjects/DiscData')
@@ -31,9 +34,11 @@ from PyQt5.QtCore import (
     Qt,
     QFileInfo,
     QProcess,
-    QSettings
-)
+    QSettings,
+    QThread
+    )
 from PyQt5.QtWidgets import (
+    QAbstractItemView,
     QAction,
     QApplication,
     QCheckBox,
@@ -46,7 +51,7 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QTableWidgetItem,
     QWidget
-)
+    )
 
 from mainwindowui import Ui_MainWindow
 from PreferencesDialog import PreferencesDialog
@@ -59,49 +64,59 @@ from PyQt5WidgetDataConnectors import (
     QRadioButtonGroupDataConnector,
     QSpinBoxDataConnector,
     QTableWidgetItemDataConnector
-)
+    )
 
 from PyQt5OverrideCursor import QWaitCursor
-from PyQt5Helpers import AddItemToTableWidgetCell
+from PyQt5Helpers import (
+    AddItemToTableWidgetCell,
+    TranslateProcessError
+    )
 from PyQt5RecentFiles import QRecentFiles
 from PyQt5Validators import (WidgetValidatorList,
     QComboBox_NotEmpty_Validator,
     QLineEdit_FolderExists_Validator,
     QLineEdit_NotBlank_Validator
-)
+    )
 from PyQt5SpinBoxDelegate import SpinBoxDelegate
 
 from AppInit import __TESTING_DO_NOT_SAVE_SESSION__
 from AudioTrackStates import (
     AudioTrackState,
+    AudioTrackStates,
     DiscMixdownsSingleton
-)
+    )
 from AudioTrackWidgets import (
     AudioTrackWidgets,
     AudioTrackWidgetsList
-)
+    )
 from ChapterRanges import ChapterRanges
+from Chapters import Chapters
 from CropWidgets import CropWidgets
 from Disc import (
     Disc,
     DiscFilenameTemplatesSingleton,
     DiscPresetsSingleton
-)
+    )
 from Preferences import FilenameTemplates
+from ResultsHtml import ResultsHtml
 from SingletonLog import SingletonLog
 from SubtitleTrackStates import SubtitleTrackState
 from SubtitleTrackWidgets import (
     SubtitleTrackWidgets,
     SubtitleTrackWidgetsList
-)
+    )
 from Titles import (
     Titles,
     TitleVisibleSingleton
-)
+    )
 from Exceptions import UserDoNotContinueException
 
 from Helpers import GetFolderVolumeLabel
-from PyHelpers import NormalizeFileName
+from PyHelpers import (
+    NormalizeFileName,
+    TimedeltaToString,
+    TemporaryFilesList
+    )
 
 VerticalHeadersVisible = namedtuple('VerticalHeadersVisible', ['firstVisualIndex',
     'lastVisualIndex', 'currentRowVisualIndex'])
@@ -268,6 +283,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.__init_Disc_SubtitleTracks()
         self.__init_Disc_Cropping()
         self.__init_DiscTitle_DetailWidgets()
+        self.__init_MakeItSo()
 
         self.__disc_audioTrackWidgets.addTrackItems(AudioTrackState.AUDIO_TRACK_CHOICES)
         self.__disc_subtitleTrackWidgets.addTrackItems(SubtitleTrackState.SUBTITLE_TRACK_CHOICES)
@@ -279,7 +295,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.load_Disc_Mixdowns()
         self.load_DiscTitle_Mixdowns()
 
-        self.Enable_Disc()
+        self.enableWidgets_HasTitle()
+        self.enableWidgets_HasSelectedTitle()
 
     def closeEvent(self, event):
         """ Save the window geometry and state before closing.
@@ -302,10 +319,18 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
         event.accept()
 
-    def Enable_Disc(self):
-        """ Enable/disable widgets throughout the main window.
+    def enableWidgets_HasSelectedTitle(self):
+        """ Enable/disable widgets throughout the main window if at least one
+            title is selected.
         """
+        enableWidgets = self.hasSelectedTitle
 
+        self.stackedWidget_MakeItSo.setEnabled(enableWidgets)
+
+    def enableWidgets_HasTitle(self):
+        """ Enable/disable widgets throughout the main window if the disc has
+            at least one title.
+        """
         enableWidgets = self.disc.titles.hasTitles
 
         self.groupBox_Disc_Notes.setEnabled(enableWidgets)
@@ -313,6 +338,37 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.groupBox_Disc_SubtitleTracks.setEnabled(self.disc.titles.hasSubtitleTrack())
         self.groupBox_Disc_Crop.setEnabled(enableWidgets)
         self.frame_DiscTitle_List.setEnabled(enableWidgets)
+
+        # Disable the individual tabs instead of the entire tab widget so the
+        # user can still flip through the tabs.
+        for idx in range(self.tabWidget_DiscTitle.count()):
+            self.tabWidget_DiscTitle.widget(idx).setEnabled(enableWidgets)
+
+    def enableDiscWidgets(self, enableWidgets):
+        """ Enable/disable widgets throughout the main window.  Used to prevent
+            changes while transcoding is running.
+        """
+        self.menuBar.setEnabled(enableWidgets)
+
+        self.frame_Disc_Source.setEnabled(enableWidgets)
+        self.groupBox_Disc_FileName.setEnabled(enableWidgets)
+        self.groupBox_Disc_Notes.setEnabled(enableWidgets)
+        self.groupBox_Processing.setEnabled(enableWidgets)
+        self.groupBox_Disc_AudioTracks.setEnabled(enableWidgets)
+        self.groupBox_Disc_SubtitleTracks.setEnabled(enableWidgets)
+        self.groupBox_Disc_Crop.setEnabled(enableWidgets)
+        self.frame_DiscTitle_List.setEnabled(enableWidgets)
+
+        if (enableWidgets):
+            self.tableWidget_Disc_Titles.setEditTriggers(QAbstractItemView.DoubleClicked
+                | QAbstractItemView.SelectedClicked | QAbstractItemView.EditKeyPressed)
+        else:
+            self.tableWidget_Disc_Titles.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        for row in range(self.tableWidget_Disc_Titles.rowCount()):
+            checkBox = self.tableWidget_Disc_Titles.cellWidget(row,
+                self.TABLE_DISC_TITLES_SELECT_COLUMN).findChild(QCheckBox,
+                'checkBox_DiscTitle_SelectTitle')
+            checkBox.setEnabled(enableWidgets)
 
         # Disable the individual tabs instead of the entire tab widget so the
         # user can still flip through the tabs.
@@ -712,9 +768,9 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.__standardTableWidgetInitialization(self.tableWidget_DiscTitle_Episodes,
             ['First Chapter', 'Last Chapter', 'Title'])
 
-        self.DiscTitle_Episodes_SpinBoxDelegate = SpinBoxDelegate()
-        self.tableWidget_DiscTitle_Episodes.setItemDelegateForColumn(0, self.DiscTitle_Episodes_SpinBoxDelegate)
-        self.tableWidget_DiscTitle_Episodes.setItemDelegateForColumn(1, self.DiscTitle_Episodes_SpinBoxDelegate)
+        self.discTitle_Episodes_SpinBoxDelegate = SpinBoxDelegate()
+        self.tableWidget_DiscTitle_Episodes.setItemDelegateForColumn(0, self.discTitle_Episodes_SpinBoxDelegate)
+        self.tableWidget_DiscTitle_Episodes.setItemDelegateForColumn(1, self.discTitle_Episodes_SpinBoxDelegate)
 
         self.radioButton_DiscTitle_AllChapters.setChecked(True)      # Set this to enable/disable chapter controls
         self.onDiscTitle_ChapterRanges_EnableWidgets()
@@ -802,6 +858,23 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.radioButton_DiscTitle_Crop_Default.setChecked(True)      # Set this to enable/disable chapter controls
         self.onDiscTitle_Cropping_EnableWidgets()
 
+    def __init_MakeItSo(self):
+        """ Initialze the widgets used to transcode a video.
+        """
+        self.resultsHtml = ResultsHtml(self, self.textBrowser_MakeItSo_Results)
+
+        self.pushButton_MakeItSo_Clear.clicked.connect(self.resultsHtml.clear)
+        self.pushButton_MakeItSo_Preview.clicked.connect(self.onButton_MakeItSo_Preview)
+        self.pushButton_MakeItSo_Run.clicked.connect(self.onButton_MakeItSo_Run)
+        self.pushButton_MakeItSo_Stop.clicked.connect(self.onButton_MakeItSo_Stop)
+
+        self.transcodingStartTime = None
+        self.transcodingWaitCursor = None
+        self.transcodingCommandsDeque = None
+        self.transcodingChaptersFilenames = None
+        self.transcodingLog = None
+        self.transcodingProcess = None
+
     @property
     def disc(self):
         """ Return the disc object."""
@@ -812,6 +885,19 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         """ Return a session file name based on the disc hash value.
         """
         return "{}.state.xml".format(self.disc.titles.hash)
+
+    @property
+    def hasSelectedTitle(self):
+        """ Return True/False if at least one title is selected.
+        """
+        for row in range(self.tableWidget_Disc_Titles.rowCount()):
+            checkBox = self.tableWidget_Disc_Titles.cellWidget(row,
+                self.TABLE_DISC_TITLES_SELECT_COLUMN).findChild(QCheckBox,
+                'checkBox_DiscTitle_SelectTitle')
+            if (checkBox.isChecked()):
+                return True
+
+        return False
 
     @property
     def preferences(self):
@@ -1168,8 +1254,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         else:
             matchingTitle = matchingTitles.defaultTitle
 
-        self.disc.customCrop.Copy(matchingTitle.autoCrop)
-        self.disc.customCrop.processChoice = self.disc.customCrop.PROCESS_AUTOMATIC
+        self.disc.customCrop.copy(matchingTitle.autoCrop)
+        self.disc.customCrop.processChoice = self.disc.customCrop.PROCESS_CUSTOM
 
         self.transferToWindow(self.WIDGET_GROUP_DISC_CROP)
         self.statusBar.showMessage('Cropping selections updated.', 15000)
@@ -1334,7 +1420,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             return
 
         title.audioTrackStates.clear()
-        self.__DiscTitle_AudioTrackStatesToWidgets(title)
+        self.discTitle_AudioTrackStatesToWidgets(title)
 
         self.onDiscTitle_AudioTracks_EnableWidgets()
 
@@ -1352,22 +1438,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             self.preferences)
         title.audioTrackStates.processChoice = title.audioTrackStates.PROCESS_CUSTOM
 
-        self.__DiscTitle_AudioTrackStatesToWidgets(title)
+        self.discTitle_AudioTrackStatesToWidgets(title)
         self.onDiscTitle_AudioTracks_EnableWidgets()
 
         self.statusBar.showMessage('Title audio track states found and set.', 15000)
         QApplication.beep()
-
-    def __DiscTitle_AudioTrackStatesToWidgets(self, title):
-        """ Transfer the title data to the title audio track state widgets on
-            the Audio Tracks tab.
-        """
-        if (title.audioTrackStates.processChoice == title.audioTrackStates.PROCESS_DEFAULT):
-            self.radioButton_DiscTitle_AudioTracks_Default.setChecked(True)
-        else:
-            self.radioButton_DiscTitle_AudioTracks_Custom.setChecked(True)
-
-        self.__discTitle_audioTrackWidgets.setWidgetsFromTrackStates(title.audioTrackStates)
 
     def onButton_DiscTitle_ChapterRange_Reset(self):
         """ Reset the chapter ranges for the selected title.
@@ -1548,7 +1623,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             return
 
         title.customCrop.clear()
-        self.__DiscTitle_CropStatesToWidgets(title)
+        self.discTitle_CropStatesToWidgets(title)
         self.onDiscTitle_Cropping_EnableWidgets()
 
         self.statusBar.showMessage('Title cropping states cleared.', 15000)
@@ -1561,9 +1636,9 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         if (title is None):
             return
 
-        title.customCrop.Copy(title.autoCrop)
+        title.customCrop.copy(title.autoCrop)
         title.customCrop.processChoice = title.customCrop.PROCESS_CUSTOM
-        self.__DiscTitle_CropStatesToWidgets(title)
+        self.discTitle_CropStatesToWidgets(title)
         self.onDiscTitle_Cropping_EnableWidgets()
 
         self.statusBar.showMessage('Title cropping states found and set.', 15000)
@@ -1718,7 +1793,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             return
 
         title.subtitleTrackStates.clear()
-        self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
+        self.discTitle_SubtitleTrackStatesToWidgets(title)
         self.onDiscTitle_SubtitleTracks_EnableWidgets()
 
         self.statusBar.showMessage('Title subtitle track states cleared.', 15000)
@@ -1735,24 +1810,477 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             self.preferences)
         title.subtitleTrackStates.processChoice = title.subtitleTrackStates.PROCESS_CUSTOM
 
-        self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
+        self.discTitle_SubtitleTrackStatesToWidgets(title)
         self.onDiscTitle_SubtitleTracks_EnableWidgets()
 
         self.statusBar.showMessage('Title subtitle track states found and set.', 15000)
         QApplication.beep()
 
-    def __DiscTitle_SubtitleTrackStatesToWidgets(self, title):
-        """ Transfer the title data to the title subtitle track state widgets on
-            the Subtitle Tracks tab.
+    def MakeCommandLineForTitle(self, title, episodeNumber, chapterRangeEpisode=None):
+        """ Returns a tuple of the command line, the output file name (with path)
+            and the filename of the chapter titles (may be None).
+
+            The output file name is used to check if the file exists.
         """
-        if (title.subtitleTrackStates.processChoice == title.subtitleTrackStates.PROCESS_DEFAULT):
-            self.radioButton_DiscTitle_SubtitleTracks_Default.setChecked(True)
+
+        # applicationState = wx.GetApp().applicationState        # Used a lot.
+        # settings = wx.GetApp().settings
+        preset = self.preferences.presets.getByName(self.disc.preset)
+
+        # Build the file name
+        # ===================
+        audioTags = []
+        if (title.audioTrackStates.isCustom):
+            audioTags = title.audioTrackStates.getMixdownTags(self.preferences.mixdowns)
         else:
-            self.radioButton_DiscTitle_SubtitleTracks_Custom.setChecked(True)
+            audioTags = self.disc.audioTrackStates.getMixdownTags(self.preferences.mixdowns)
 
-        self.__discTitle_subtitleTrackWidgets.setWidgetsFromTrackStates(title.subtitleTrackStates)
+        chapterRangeEpisodeTitle = ''
+        if (chapterRangeEpisode is not None):
+            chapterRangeEpisodeTitle = chapterRangeEpisode.title
 
-    def __DiscTitle_CropStatesToWidgets(self, title):
+        filename = self.preferences.filenameTemplates.buildFilename(
+            self.disc.filenameTemplate,
+            self.disc.title,
+            preset.tag,
+            audioTags,
+            '{0:0{1}d}'.format(episodeNumber, self.disc.episodeNumberPrecision),
+            title.title,
+            chapterRangeEpisodeTitle
+            )
+
+        # Assemble the commands
+        # =====================
+        commands = []
+        outputFilename = os.path.join(self.disc.destination, filename)
+
+        commands.append('-i "{}"'.format(self.disc.source))
+        commands.append('-o "{}"'.format(outputFilename))
+
+        commands.append('-t {0:d}'.format(title.titleNumber))
+
+        # Build the audio commands
+        # ------------------------
+        trackMixdowns = []
+
+        tracks = []
+        encoders = []
+        mixdowns = []
+        sampleRates = []
+        bitrates = []
+        dynamicRangeCompressions = []
+        gains = []
+
+        trackNames = []
+
+        if (title.audioTrackStates.isCustom):
+            for audioTrackState in title.audioTrackStates:
+                if (not audioTrackState.track):
+                    continue
+
+                mixdown = self.preferences.mixdowns.getByName(audioTrackState.primaryMixdown)
+                if (mixdown is not None):
+                    trackMixdowns.append((audioTrackState.track, mixdown))
+
+                mixdown = self.preferences.mixdowns.getByName(audioTrackState.secondaryMixdown)
+                if (mixdown is not None):
+                    trackMixdowns.append((audioTrackState.track, mixdown))
+        else:
+            for audioTrackState in self.disc.audioTrackStates:
+                if (not audioTrackState.track):
+                    continue
+
+                mixdown = self.preferences.mixdowns.getByName(audioTrackState.primaryMixdown)
+                if (mixdown is not None):
+                    trackMixdowns.append((audioTrackState.track, mixdown))
+
+                mixdown = self.preferences.mixdowns.getByName(audioTrackState.secondaryMixdown)
+                if (mixdown is not None):
+                    trackMixdowns.append((audioTrackState.track, mixdown))
+
+        for track, mixdown in trackMixdowns:
+            tracks.append(str(track))
+            encoders.append(mixdown.encoder)
+            mixdowns.append(mixdown.mixdown)
+            sampleRates.append(mixdown.sampleRate)
+            bitrates.append(mixdown.bitrate)
+            dynamicRangeCompressions.append(mixdown.dynamicRangeCompression)
+            gains.append(mixdown.gain)
+
+
+        if (len(tracks) > 0):
+            commands.append('-a {}'.format(','.join(tracks)))
+            commands.append('-E {}'.format(','.join(encoders)))
+            commands.append('-6 {}'.format(','.join(mixdowns)))
+            commands.append('-R {}'.format(','.join(sampleRates)))
+            commands.append('-B {}'.format(','.join(bitrates)))
+            commands.append('-D {}'.format(','.join(dynamicRangeCompressions)))
+            commands.append('--gain {}'.format(','.join(gains)))
+
+        # Build the subititle commands
+        # ----------------------------
+        tracks = []
+        forced = []
+        burn = None
+        default = None
+
+        if (title.subtitleTrackStates.isCustom):
+            subtitleTrackStates = title.subtitleTrackStates
+        else:
+            subtitleTrackStates = self.disc.subtitleTrackStates
+
+        index = 0
+        for subtitleTrackState in subtitleTrackStates:
+            found = False
+            if (subtitleTrackState.track):         # a.k.a. user selected
+                tracks.append(subtitleTrackState.track)
+                found = True
+
+            if (found == True):
+                index += 1
+                if (subtitleTrackState.forced):
+                    forced.append(str(index))
+                if (subtitleTrackState.burn):
+                    burn = str(index)
+                if (subtitleTrackState.default):
+                    default = str(index)
+
+        if (len(tracks) > 0):
+            commands.append('-s {}'.format(','.join(tracks)))
+
+            if (len(forced) > 0):
+                commands.append('--subtitle-forced={}'.format(','.join(forced)))
+            if (burn is not None):
+                commands.append('--subtitle-burned={}'.format(burn))
+            if (default is not None):
+                commands.append('--subtitle-default={}'.format(default))
+
+        # nodvdnav processing
+        # ----------------------
+
+        if (self.disc.nodvdnav):
+            commands.append('--no-dvdnav')
+
+        # custom cropping processing
+        # --------------------------
+        cropping = None
+
+        # Custom cropping can be done at the title level or at the application level.
+        if (title.customCrop.isCustom):
+            cropping = title.customCrop
+        elif (title.customCrop.isDefault and self.disc.customCrop.isCustom):
+            cropping = self.disc.customCrop
+
+        if (cropping is not None):
+            commands.append('--crop {}:{}:{}:{}'.format(
+                cropping.top, cropping.bottom,
+                cropping.left, cropping.right))
+
+        # Chapter processing
+        # ------------------
+        chaptersFilename = None
+        if (title.chapters.processChoice == Chapters.PROCESS_MARKERS):
+            commands.append('-m')
+        elif (title.chapters.processChoice == Chapters.PROCESS_NAMES):
+            chaptersFile, chaptersFilename = tempfile.mkstemp(suffix='.chapters.csv', prefix='wxHEP_')
+
+            for chapter in title.chapters:
+                if (self.preferences.options.numberChapterNames):
+                    line = '{},{}: {}\r\n'.format(chapter.chapterNumber,
+                        chapter.chapterNumber + title.chapters.firstChapterNumber - 1,
+                        chapter.title)
+                else:
+                    line = '{},{}\r\n'.format(chapter.chapterNumber, chapter.title)
+
+                os.write(chaptersFile, line.encode(encoding='utf-8'))
+
+            os.close(chaptersFile)
+            commands.append('--markers="{}"'.format(chaptersFilename))
+
+        if (title.chapterRanges.processChoice == ChapterRanges.PROCESS_RANGE):
+            if (title.chapterRanges.firstChapter == title.chapterRanges.lastChapter):
+                commands.append('-c {}'.format(title.chapterRanges.firstChapter))
+            else:
+                commands.append('-c {}-{}'.format(title.chapterRanges.firstChapter, title.chapterRanges.lastChapter))
+        elif (title.chapterRanges.processChoice == title.chapterRanges.PROCESS_EPISODES and chapterRangeEpisode is not None):
+            commands.append('-c {}-{}'.format(chapterRangeEpisode.firstChapter, chapterRangeEpisode.lastChapter))
+
+        # Last but not least, the preset settings
+        # ---------------------------------------
+        commands.append(preset.settings)
+
+        return (' '.join(commands), outputFilename, chaptersFilename)
+
+    def MakeCommandLines(self, titles):
+        """ Returns a tupple:
+
+            * A list of command lines for the selected, visible titles.  The
+              list will be empty if nothing is found.
+            * A list chapter filenames that are created for titles with custom
+              chapters names.  The list will be empty is nothing is found.
+              The list is used to delete the files after all transcoding is
+              complete.
+
+            The method will check the output filename for the video.  It will
+            ask the user about overwriting existing files.
+
+            The method will always clean up any temporary files, such as chapter
+            name files, before throwing any exceptions.
+
+            WARNING: This method rasies a UserDoNotContinueException if the user
+            responds with "NO" when asked 'Do you want to overwrite the
+            existing file?'
+        """
+        commandLines = []
+        outputFilenames = []
+        chaptersFilenames = TemporaryFilesList()
+        episodeNumber = self.disc.firstEpisodeNumber
+
+        for title in titles:
+            if (title.chapterRanges.processChoice == ChapterRanges.PROCESS_EPISODES):
+                for chapterRange in title.chapterRanges:
+                    commandLine, outputFilename, chaptersFilename = self.MakeCommandLineForTitle(title, episodeNumber, chapterRange)
+                    commandLines.append(commandLine)
+                    outputFilenames.append(outputFilename)
+                    if (chaptersFilename is not None):
+                        chaptersFilenames.append(chaptersFilename)
+                    episodeNumber += 1
+            else:
+                commandLine, outputFilename, chaptersFilename = self.MakeCommandLineForTitle(title, episodeNumber)
+                commandLines.append(commandLine)
+                outputFilenames.append(outputFilename)
+                if (chaptersFilename is not None):
+                    chaptersFilenames.append(chaptersFilename)
+                episodeNumber += 1
+
+        # for outputFilename in outputFilenames:
+        #     if (os.path.exists(outputFilename)):
+        #
+        #         result = wx.MessageBox("Warning! File '{} already exists.  Do you want to continue?".format(os.path.basename(outputFilename)),
+        #             "File Already Exists", wx.YES_NO)
+        #
+        #         if (result == wx.NO):
+        #             return
+
+        return (commandLines, chaptersFilenames)
+
+    def onButton_MakeItSo_Run(self):
+        """ Preview the commands used to transcode each selected title.
+        """
+        self.transferFromWindow()
+
+        if (not self.validate()):
+            return
+
+        matchingTitles = self.disc.titles.matchingTitles(
+            Titles.FLAG_SELECTED | Titles.FLAG_VISIBLE)
+
+        if (not len(matchingTitles.matchingTitles)):
+            QMessageBox.warning(self, 'Titles Error',
+                ('Error!  This video does not have any visible, selected titles.'
+                '  Please select something and try again.'))
+            return
+
+        commandLines, chaptersFilenames = self.MakeCommandLines(matchingTitles.matchingTitles)
+
+        self.transcodingStartTime = datetime.datetime.now()
+        self.transcodingWaitCursor = QWaitCursor()
+        self.transcodingCommandsDeque = deque(commandLines)
+        # self.transcodingCommandsDeque = deque(['./TestFiles/countdown -c 20', './TestFiles/countdown -c 15', './TestFiles/countdown -c 4'])
+
+        self.transcodingChaptersFilenames = chaptersFilenames
+        self.transcodingLog = None
+        if (self.preferences.logging.commandsAndTimestamps):
+            self.transcodingLog = SingletonLog()
+
+        self.statusBar.showMessage('Transcoding...')
+        self.resultsHtml.appendParagraph('TRANSCODING', 'c0', self.transcodingLog)
+
+        self.resultsHtml.appendParagraph('Transcoding start @ {}'.format(
+            self.transcodingStartTime.strftime('%x %X')), 'c1',
+            self.transcodingLog)
+
+        self.enableDiscWidgets(False)
+        self.stackedWidget_MakeItSo.setCurrentIndex(1)
+
+        self.__transcode_nextTitle()
+
+    # TODO Enhancement - on process kill, delete partial file
+
+    def onButton_MakeItSo_Stop(self):
+
+        self.resultsHtml.appendParagraph('Transcoding canceled by user', 'c0', self.transcodingLog)
+        self.transcodingCommandsDeque.clear()
+        self.transcodingProcess.kill()
+
+        # __transcode_complete() called by onTranscoding_errorOccurred() which is triggered by kill()
+
+    def __transcode_nextTitle(self):
+
+        self.transcodingProcess = QProcess(QApplication.instance())
+        self.transcodingProcess.errorOccurred.connect(self.onTranscoding_errorOccurred)
+        self.transcodingProcess.finished.connect(self.onTranscoding_finished)
+        self.transcodingProcess.readyReadStandardError.connect(self.onTranscoding_readyReadStandardError)
+        self.transcodingProcess.readyReadStandardOutput.connect(self.onTranscoding_readyReadStandardOutput)
+        # self.transcodingProcess.started.connect(self.onTranscoding_started)
+        # self.transcodingProcess.stateChanged.connect(self.onTranscoding_stateChanged)
+
+        command = self.transcodingCommandsDeque.popleft()
+
+        self.trancodingTitleStartTime = datetime.datetime.now()
+        self.resultsHtml.appendParagraph('Title start @ {}'.format(
+            self.trancodingTitleStartTime.strftime('%x %X')), 'c2',
+            self.transcodingLog)
+
+        commandLine = '{} {}'.format(self.preferences.executables.handBrakeCLI,
+            command)
+        self.resultsHtml.appendParagraph(commandLine, 'c3', self.transcodingLog)
+        self.transcodingProcess.start(commandLine)
+
+    def __transcode_complete(self):
+
+        titleStopTime = datetime.datetime.now()
+        self.resultsHtml.appendParagraph(('Title finished @ {}'
+            '&ensp;&ensp;&#10148;&#10148;&#10148;&ensp;&ensp;'
+            'Elapsed time {}').format(titleStopTime.strftime('%x %X'),
+            TimedeltaToString(titleStopTime - self.trancodingTitleStartTime)),
+            'c2', self.transcodingLog)
+
+        if (self.transcodingCommandsDeque and len(self.transcodingCommandsDeque)):
+            self.__transcode_nextTitle()
+            return
+
+        self.stackedWidget_MakeItSo.setCurrentIndex(0)
+        self.enableDiscWidgets(True)
+
+        stopTime = datetime.datetime.now()
+        self.resultsHtml.appendParagraph(('Transcoding finished @ {}'
+            '&ensp;&ensp;&#10148;&#10148;&#10148;&ensp;&ensp;'
+            'Elapsed time {}').format(stopTime.strftime('%x %X'),
+            TimedeltaToString(stopTime - self.transcodingStartTime)), 'c1',
+            self.transcodingLog)
+
+        self.transcodingStartTime = None
+        del self.transcodingWaitCursor
+        self.transcodingWaitCursor = None
+        self.transcodingCommandsDeque = None
+        self.transcodingChaptersFilenames.unlink()
+        self.transcodingChaptersFilenames = None
+        self.transcodingLog = None
+        self.transcodingProcess = None
+
+        self.resultsHtml.appendParagraph('&nbsp;', 'c1')
+        QApplication.beep()
+
+        self.statusBar.showMessage('Transcoding finished.', 15000)
+
+    def onButton_MakeItSo_Preview(self):
+        """ Preview the commands used to transcode each selected title.
+        """
+        self.transferFromWindow()
+
+        if (not self.validate()):
+            return
+
+        matchingTitles = self.disc.titles.matchingTitles(
+            Titles.FLAG_SELECTED | Titles.FLAG_VISIBLE)
+
+        if (not len(matchingTitles.matchingTitles)):
+            QMessageBox.warning(self, 'Titles Error',
+                ('Error!  This video does not have any visible, selected titles.'
+                '  Please select something and try again.'))
+            return
+
+        log = None
+        if (self.preferences.logging.commandsAndTimestamps):
+            log = SingletonLog()
+
+        self.statusBar.showMessage('Preview running...')
+        self.resultsHtml.appendParagraph('PREVIEW', 'c0', log)
+
+        with QWaitCursor():
+            startTime = datetime.datetime.now()
+            self.resultsHtml.appendParagraph('Encoding starting @ {}'.format(
+                startTime.strftime('%x %X')), 'c1', log)
+
+            commandLines, chaptersFilenames = self.MakeCommandLines(matchingTitles.matchingTitles)
+            for commandLine in commandLines:
+
+                titleStartTime = datetime.datetime.now()
+                self.resultsHtml.appendParagraph('Title starting @ {}'.format(
+                    titleStartTime.strftime('%x %X')), 'c2', log)
+
+                self.resultsHtml.appendParagraph('{} {}'.format(self.preferences.executables.handBrakeCLI, commandLine), 'c3', log)
+                # if (runCLI):
+                #     app.RunHbcli(commandLine, False)
+                # else:
+                #     for i in range(20):
+                #         wx.MilliSleep(100)
+                #         wx.Yield()
+                QThread.sleep(2)
+
+                titleStopTime = datetime.datetime.now()
+                self.resultsHtml.appendParagraph(('Title finished @ {}'
+                    '&ensp;&ensp;&#10148;&#10148;&#10148;&ensp;&ensp;'
+                    'Elapsed time {}').format(titleStopTime.strftime('%x %X'),
+                    TimedeltaToString(titleStopTime - titleStartTime)), 'c2', log)
+
+            stopTime = datetime.datetime.now()
+            self.resultsHtml.appendParagraph(('Encoding finished @ {}'
+                '&ensp;&ensp;&#10148;&#10148;&#10148;&ensp;&ensp;'
+                'Elapsed time {}').format(stopTime.strftime('%x %X'),
+                TimedeltaToString(stopTime - startTime)), 'c1', log)
+
+            self.resultsHtml.appendParagraph('&nbsp;', 'c1')
+            QApplication.beep()
+
+        self.statusBar.showMessage('Preview complete.', 15000)
+
+    def onTranscoding_errorOccurred(self, error):
+        self.resultsHtml.appendParagraph('A process error has occured: {}'.format(
+            TranslateProcessError(error)), 'c3', self.transcodingLog)
+
+        self.__transcode_complete()
+
+    # TODO Route preview throuch makeItSo
+    # TODO about box
+
+    def onTranscoding_finished(self, exitCode, exitStatus):
+
+        if (exitCode):
+            self.resultsHtml.appendParagraph(('WARNING!  Handbrake has '
+                'finished with error code {}!').format(exitCode), 'c0',
+                self.transcodingLog)
+
+        if (exitStatus == QProcess.NormalExit):
+            self.__transcode_complete()
+
+    def onTranscoding_readyReadStandardError(self):
+        sys.stderr.buffer.write(self.transcodingProcess.readAllStandardError())
+        sys.stderr.flush()
+
+    def onTranscoding_readyReadStandardOutput(self):
+        sys.stdout.buffer.write(self.transcodingProcess.readAllStandardOutput())
+        sys.stdout.flush()
+
+    # def onTranscoding_started(self):
+    #     print('onTranscoding_started')
+    #
+    # def onTranscoding_stateChanged(self, newState):
+    #     print('onTranscoding_stateChanged', newState)
+
+    def discTitle_AudioTrackStatesToWidgets(self, title):
+        """ Transfer the title data to the title audio track state widgets on
+            the Audio Tracks tab.
+        """
+        if (title.audioTrackStates.processChoice == title.audioTrackStates.PROCESS_DEFAULT):
+            self.radioButton_DiscTitle_AudioTracks_Default.setChecked(True)
+        else:
+            self.radioButton_DiscTitle_AudioTracks_Custom.setChecked(True)
+
+        self.__discTitle_audioTrackWidgets.setWidgetsFromTrackStates(title.audioTrackStates)
+
+    def discTitle_CropStatesToWidgets(self, title):
         """ Transfer the title data to the title crop state widgets on the
             Cropping tab.
         """
@@ -1765,7 +2293,18 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
         self.__discTitle_cropWidgets.setWidgetsFromCrop(title.customCrop)
 
-    def __DiscTitle_ShowTabIcon(self, idx, hideIcon):
+    def discTitle_SubtitleTrackStatesToWidgets(self, title):
+        """ Transfer the title data to the title subtitle track state widgets on
+            the Subtitle Tracks tab.
+        """
+        if (title.subtitleTrackStates.processChoice == title.subtitleTrackStates.PROCESS_DEFAULT):
+            self.radioButton_DiscTitle_SubtitleTracks_Default.setChecked(True)
+        else:
+            self.radioButton_DiscTitle_SubtitleTracks_Custom.setChecked(True)
+
+        self.__discTitle_subtitleTrackWidgets.setWidgetsFromTrackStates(title.subtitleTrackStates)
+
+    def discTitle_ShowTabIcon(self, idx, hideIcon):
         """ Set/clear the icon for a disc title details tab.
         """
         if (hideIcon):
@@ -1808,7 +2347,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.__discTitle_audioTrackWidgets.setEnabled(self.radioButton_DiscTitle_AudioTracks_Custom.isChecked())
         self.__discTitle_audioTrackWidgets.enableMixdowns()
 
-        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_AUDIO_TRACKS,
+        self.discTitle_ShowTabIcon(self.TAB_INDEX_AUDIO_TRACKS,
             self.radioButton_DiscTitle_AudioTracks_Default.isChecked())
 
     def onDiscTitle_ChapterRanges_EnableWidgets(self, bool=False):              # revised
@@ -1839,7 +2378,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             self.toolButton_DiscTitle_DeleteEpisode.setEnabled(enableEpisodesWidgets2)
             self.toolButton_DiscTitle_Episodes_DeleteAll.setEnabled(enableEpisodesWidgets2)
 
-        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_CHAPTER_RANGES,
+        self.discTitle_ShowTabIcon(self.TAB_INDEX_CHAPTER_RANGES,
             self.radioButton_DiscTitle_AllChapters.isChecked())
 
     def onDiscTitle_Chapters_EnableWidgets(self, bool=False):                   # revised
@@ -1862,7 +2401,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
             self.tableWidget_DiscTitle_Chapters.setEnabled(enableWidgets)
 
-        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_CHAPTERS,
+        self.discTitle_ShowTabIcon(self.TAB_INDEX_CHAPTERS,
             self.radioButton_DiscTitle_Chapters_IncludeMarkers.isChecked())
 
     def onDiscTitle_Cropping_EnableWidgets(self, bool=False):                   # revised
@@ -1877,7 +2416,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
         self.__discTitle_cropWidgets.setEnabled(self.radioButton_DiscTitle_Crop_Custom.isChecked())
 
-        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_CROPPING,
+        self.discTitle_ShowTabIcon(self.TAB_INDEX_CROPPING,
             self.radioButton_DiscTitle_Crop_Default.isChecked())
 
     def onDiscTitle_SubtitleTracks_EnableWidgets(self, bool=False):             # revised
@@ -1896,7 +2435,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.__discTitle_subtitleTrackWidgets.setEnabled(self.radioButton_DiscTitle_SubtitleTracks_Custom.isChecked())
         self.__discTitle_subtitleTrackWidgets.enableCheckBoxes()
 
-        self.__DiscTitle_ShowTabIcon(self.TAB_INDEX_SUBTITLES,
+        self.discTitle_ShowTabIcon(self.TAB_INDEX_SUBTITLES,
             self.radioButton_DiscTitle_SubtitleTracks_Default.isChecked())
 
     # def onDiscTitle_AllChapters(self, enabled):
@@ -2088,8 +2627,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         # delegate for the first and second columns and this attribute are all
         # the same object.  Remember, a new spinbox is created every time a cell
         # is edited.
-        self.DiscTitle_Episodes_SpinBoxDelegate.minimum = title.chapters.lowestChapterNumber
-        self.DiscTitle_Episodes_SpinBoxDelegate.maximum = title.chapters.highestChapterNumber
+        self.discTitle_Episodes_SpinBoxDelegate.minimum = title.chapters.lowestChapterNumber
+        self.discTitle_Episodes_SpinBoxDelegate.maximum = title.chapters.highestChapterNumber
 
         self.tableWidget_DiscTitle_Episodes.setRowCount(len(title.chapterRanges.episodes))
         idx = 0
@@ -2100,13 +2639,13 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.tableWidget_DiscTitle_Episodes.resizeColumnsToContents()
         self.onDiscTitle_ChapterRanges_EnableWidgets()
 
-        self.__DiscTitle_AudioTrackStatesToWidgets(title)
+        self.discTitle_AudioTrackStatesToWidgets(title)
         self.onDiscTitle_AudioTracks_EnableWidgets()
 
-        self.__DiscTitle_SubtitleTrackStatesToWidgets(title)
+        self.discTitle_SubtitleTrackStatesToWidgets(title)
         self.onDiscTitle_SubtitleTracks_EnableWidgets()
 
-        self.__DiscTitle_CropStatesToWidgets(title)
+        self.discTitle_CropStatesToWidgets(title)
         self.onDiscTitle_Cropping_EnableWidgets()
 
     def __titleDetailsFromWidgets(self):
@@ -2230,7 +2769,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
         self.onButton_Disc_SourceDiskLabel_Get()
 
-        self.Enable_Disc()
+        self.enableWidgets_HasTitle()
+        self.enableWidgets_HasSelectedTitle()
         self.__disc_audioTrackWidgets.enableMixdowns()
         self.__disc_subtitleTrackWidgets.enableCheckBoxes()
 
@@ -2270,7 +2810,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.setCurrentFile(sessionFilename)
         self.transferToWindow()
 
-        self.Enable_Disc()
+        self.enableWidgets_HasTitle()
+        self.enableWidgets_HasSelectedTitle()
         self.__disc_audioTrackWidgets.enableMixdowns()
         self.__disc_subtitleTrackWidgets.enableCheckBoxes()
 
@@ -2286,7 +2827,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.widgetValidators.clearHighlights()
 
         with QWaitCursor():
-            parameters = ['-t', '0', ]
+            parameters = ['-t', '0']
 
             if (self.checkBox_Disc_NoDVDNAV.isChecked()):
                 parameters.append('--no-dvdnav')
@@ -2308,15 +2849,21 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
                     'An error has occurred while running HandBrake.\nHandBrakeCLI did not finish.')
                 return False
 
+            # Don't know why but HandBrake returns the results on StandardError not StandardOutput (linux)
+            out = bytearray(process.readAllStandardError()).decode('ISO-8859-1')
+
+            if (self.preferences.logging.analysis):
+                log = SingletonLog()
+                log.writeline('{} {}'.format(self.preferences.executables.handBrakeCLI, ' '.join(parameters)))
+                log.write(out)
+
             if (process.exitCode() != 0):
                 QMessageBox.critical(self, 'Run Error',
-                    'An error has occurred while running HandBrake.\nExit code = {}\n{}'.format(process.exitCode(),
-                    bytearray(process.readAllStandardError()).decode('utf-8')))
+                    ('An error has occurred while running HandBrake.\n'
+                    'Exit code = {}\n{}').format(process.exitCode(), out))
                 return False
 
-            # Don't know why but HandBrake returns the results on StandardError not StandardOutput (linux)
-            self.disc.parse(bytearray(process.readAllStandardError()).decode('ISO-8859-1'))
-            # self.disc.parse(bytearray(process.readAllStandardError()).decode('utf-8'))
+            self.disc.parse(out)
 
             self.statusBar.showMessage('Source folder "{}" was read.'.format(self.lineEdit_Disc_Source.text()), 15000)
             return True
@@ -2484,7 +3031,6 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         return (not notValid)
 
     # TODO auto save sessions.
-    # TODO Titles - at least one title must exist; do not enable make it so, view test
     # TODO Validate - only loop through the title list once during validation.
     # TODO need a way to highlight/clear fields/widgets.  Clearing the error is the hard part.
     # TODO resolve data transfer, enable/disable conflict between data/widget connectors and widget collection classes like this one.

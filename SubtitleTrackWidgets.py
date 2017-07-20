@@ -18,6 +18,7 @@
 
 from collections import MutableSequence
 
+from PyQt5Helpers import UpdateComboBox
 from SubtitleTrackStates import (SubtitleTrackState, SubtitleTrackStates)
 
 class SubtitleTrackWidgets(object):
@@ -59,8 +60,7 @@ class SubtitleTrackWidgets(object):
     def addTrackItems(self, items):
         """ Add the dropdown list items to the track widget.
         """
-        self.trackWidget.clear()
-        self.trackWidget.addItems(items)
+        UpdateComboBox(self.trackWidget, items)
 
     def onSignal_trackWidget_currentTextChanged(self, text=None):
         """ Enable/disable the mixdown widgets, based on the track widget.

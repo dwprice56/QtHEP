@@ -21,6 +21,7 @@ from collections import MutableSequence
 from PyQt5.QtWidgets import QApplication
 
 from AudioTrackStates import (AudioTrackState, AudioTrackStates)
+from PyQt5Helpers import UpdateComboBox
 
 class AudioTrackWidgets(object):
     """ Contains the widgets for a single audio track.
@@ -57,17 +58,13 @@ class AudioTrackWidgets(object):
     def addTrackItems(self, items):
         """ Add the dropdown list items to the track widget.
         """
-        self.trackWidget.clear()
-        self.trackWidget.addItems(items)
+        UpdateComboBox(self.trackWidget, items)
 
     def addMixdownItems(self, items):
-        """ Add the dropdown list items to the both of the mixdown widgets.
+        """ Add the dropdown list items to both of the mixdown widgets.
         """
-        self.primaryMixdownWidget.clear()
-        self.primaryMixdownWidget.addItems(items)
-
-        self.secondaryMixdownWidget.clear()
-        self.secondaryMixdownWidget.addItems(items)
+        UpdateComboBox(self.primaryMixdownWidget, items)
+        UpdateComboBox(self.secondaryMixdownWidget, items)
 
     def setEnabled(self, enabled):
         """ Enable/disable all of the audio track widgets.
@@ -205,16 +202,3 @@ class AudioTrackWidgetsList(MutableSequence):
 
         for idx in range(len(trackStates)):
             self.trackWidgetsList[idx].setWidgetsFromTrackState(trackStates[idx])
-
-    # def Validate(self):
-    #     """ At least one track with at least one mixdown must be selected for
-    #         the audio track widgets to be valid.
-    #     """
-    #
-    #
-    #
-    #
-    #
-    #
-    #
-    #     return False
