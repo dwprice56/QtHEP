@@ -19,8 +19,8 @@
 import argparse, os, os.path, sys
 # import time
 
-sys.path.insert(0, '/home/dave/QtProjects/Helpers')
-sys.path.insert(0, '/home/dave/QtProjects/DiscData')
+sys.path.insert(0, '../Helpers')
+sys.path.insert(0, '../DiscData')
 
 # from PyQt5.QtWidgets import QMainWindow, QApplication, QMessageBox, QTreeWidgetItem
 # from PyQt5.QtCore import QProcess

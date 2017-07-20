@@ -18,7 +18,7 @@
 
 import copy, os.path, pathlib, sys
 
-sys.path.insert(0, '/home/dave/QtProjects/Helpers')
+sys.path.insert(0, '../Helpers')
 
 from SingletonLog import SingletonLog
 

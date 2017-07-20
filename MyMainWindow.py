@@ -24,8 +24,8 @@ from collections import (
     namedtuple
 )
 
-sys.path.insert(0, '/home/dave/QtProjects/Helpers')
-sys.path.insert(0, '/home/dave/QtProjects/DiscData')
+sys.path.insert(0, '../Helpers')
+sys.path.insert(0, '../DiscData')
 
 # from PyQt5.QtWidgets import QTreeWidgetItem
 from PyQt5.QtGui import QIcon
@@ -2244,6 +2244,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
     # TODO Route preview throuch makeItSo
     # TODO about box
+    # TODO Transcoding method comments
 
     def onTranscoding_finished(self, exitCode, exitStatus):
 

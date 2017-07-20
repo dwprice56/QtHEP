@@ -20,7 +20,7 @@ import os, os.path, sys, xml.dom, xml.dom.minidom as minidom
 
 from collections import MutableSequence
 
-sys.path.insert(0, '/home/dave/QtProjects/Helpers')
+sys.path.insert(0, '../Helpers')
 
 import XMLHelpers
 from SingletonLog import SingletonLog
