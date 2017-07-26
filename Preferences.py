@@ -812,9 +812,10 @@ class Presets(MutableSequence):
     XMLNAME = 'Presets'
 
     DEFAULT_PRESETS = [
-        ['Film',      'Film',    '--detelecine --decomb --strict-anamorphic --modulus 16 -e x264 -q 20 --vfr --x264-preset=slow   --x264-profile=high --x264-tune="film"      --h264-level="4.1" -v 1'],
-        ['Animation', 'Anime',   '--detelecine --decomb --strict-anamorphic --modulus 16 -e x264 -q 20 --vfr --x264-preset=slow   --x264-profile=high --x264-tune="animation" --h264-level="4.1" -v 1'],
-        ['Trailer',   'Trailer', '--detelecine --decomb --strict-anamorphic --modulus 16 -e x264 -q 24 --vfr --x264-preset=medium --x264-profile=main --x264-tune="film"      --h264-level="4.1" -v 1']
+        ['Film',      'Film',    '--detelecine --decomb --auto-anamorphic --modulus 16 -e x264 -q 20 --vfr --x264-preset=slow   --x264-profile=high --x264-tune="film"      --h264-level="4.1" -v 1'],
+        ['Animation', 'Anime',   '--detelecine --decomb --auto-anamorphic --modulus 16 -e x264 -q 20 --vfr --x264-preset=slow   --x264-profile=high --x264-tune="animation" --h264-level="4.1" -v 1'],
+        ['Trailer',   'Trailer', '--detelecine --decomb --auto-anamorphic --modulus 16 -e x264 -q 24 --vfr --x264-preset=medium --x264-profile=main --x264-tune="film"      --h264-level="4.1" -v 1'],
+        ['Extra',     'Extra',   '--detelecine --decomb --modulus 16 -e x264 -q 22 --vfr --encoder-preset=faster  --encoder-profile=main  --encoder-tune="film"  --encoder-level="4.1" -v 1']
     ]
 
     def __init__(self,parent):
@@ -1010,8 +1011,8 @@ class Mixdowns(MutableSequence):
         ('COPYAC3', 'AC3', 'copy:ac3', 'auto', 'Auto', '0', '0.0', '0'),
         ('COPYDTS', 'DTS', 'copy:dts', 'auto', 'Auto', '0', '0.0', '0'),
         ('COPYDTSHD', 'DTSHD', 'copy:dtshd', 'auto', 'Auto', '0', '0.0', '0'),
-        ('HQAAC', 'AAC', 'faac', 'dpl2', 'Auto', '192', '0.0', '0'),
-        ('LQAAC', 'AAC', 'faac', 'dpl2', '48', '160', '0.0', '0')
+        ('AAC 5.1', 'AAC', 'av_aac', '5point1', 'Auto', '192', '0.0', '0'),
+        ('AAC DPL2', 'AAC', 'av_aac', 'dpl2', 'Auto', '192', '0.0', '0')
     ]
 
     def __init__(self, parent):
@@ -1100,8 +1101,8 @@ class Mixdowns(MutableSequence):
         """
         mixdown = Mixdown(self)
 
-        mixdown.name, mixdown.tag, mixdown.encoder, mixdown.mixdown,
-        mixdown.sampleRate, mixdown.bitrate, mixdown.dynamicRangeCompression,
+        mixdown.name, mixdown.tag, mixdown.encoder, mixdown.mixdown, \
+        mixdown.sampleRate, mixdown.bitrate, mixdown.dynamicRangeCompression, \
         mixdown.gain = self.DEFAULT_MIXDOWNS[0]
 
         return mixdown

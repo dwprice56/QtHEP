@@ -46,6 +46,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QInputDialog,
+    QLabel,
     QMainWindow,
     QMenu,
     QMessageBox,
@@ -233,6 +234,9 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
         self.widgetValidators = WidgetValidatorList()
 
+        self.label_SampleFilename = QLabel()
+        self.statusBar.addWidget(self.label_SampleFilename)
+
         # self.__tabIcon_Highlight = QIcon('images/draw_ellipse_16.png')
         self.__tabIcon_Clear = QIcon()
         self.__tabIcon_Highlight = QIcon('images/diamond_16.png')
@@ -272,10 +276,18 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.action_RecentFileList_Clear.triggered.connect(self.onAction_RecentFileList_Clear)
         self.action_RecentFileList_RemoveMissingFiles.triggered.connect(self.onAction_RecentFileList_RemoveMissingFiles)
 
+        # Help menu actions
+        # ======================================================================
+        self.actionAbout.triggered.connect(self.onAction_About)
+        self.actionAbout_Qt.triggered.connect(QApplication.aboutQt)
+
         self.__init_Disc_Fields()
         self.__init_Disc_FilenameAndNotesFields()
+
         self.__widgetDataConnectors.append(QComboBoxDataConnector(
             self.comboBox_Disc_Preset, self.disc, 'preset'))
+        self.comboBox_Disc_Preset.currentTextChanged.connect(self.onUpdateSampleFilename)
+
         self.__widgetDataConnectors.append(QCheckBoxDataConnector(
             self.checkBox_Disc_HideShortTitles, self.disc, 'hideShortTitles'))
         self.checkBox_Disc_HideShortTitles.toggled.connect(self.onSignal_toggled_Disc_HideShortTitles)
@@ -334,8 +346,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         enableWidgets = self.disc.titles.hasTitles
 
         self.groupBox_Disc_Notes.setEnabled(enableWidgets)
-        self.groupBox_Disc_AudioTracks.setEnabled(self.disc.titles.hasAudioTrack())
-        self.groupBox_Disc_SubtitleTracks.setEnabled(self.disc.titles.hasSubtitleTrack())
+        self.groupBox_Disc_AudioTracks.setEnabled(enableWidgets)
+        self.groupBox_Disc_SubtitleTracks.setEnabled(enableWidgets)
         self.groupBox_Disc_Crop.setEnabled(enableWidgets)
         self.frame_DiscTitle_List.setEnabled(enableWidgets)
 
@@ -343,6 +355,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         # user can still flip through the tabs.
         for idx in range(self.tabWidget_DiscTitle.count()):
             self.tabWidget_DiscTitle.widget(idx).setEnabled(enableWidgets)
+
+        self.stackedWidget_MakeItSo.setEnabled(self.hasSelectedTitle)
 
     def enableDiscWidgets(self, enableWidgets):
         """ Enable/disable widgets throughout the main window.  Used to prevent
@@ -457,6 +471,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             self.comboBox_Disc_AudioTracks_Mixdown_Third_Secondary
         ))
 
+        for audioTrackWidgets in self.__disc_audioTrackWidgets:
+            audioTrackWidgets.trackWidget.currentTextChanged.connect(self.onUpdateSampleFilename)
+            audioTrackWidgets.primaryMixdownWidget.currentTextChanged.connect(self.onUpdateSampleFilename)
+            audioTrackWidgets.secondaryMixdownWidget.currentTextChanged.connect(self.onUpdateSampleFilename)
+
         # Create the validators.
         # ======================================================================
 
@@ -567,6 +586,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
         self.toolButton_ResetFirstEpisode.clicked.connect(self.onButton_Disc_Reset_FirstEpisode)
         self.toolButton_ResetEpisodeNumberPrecision.clicked.connect(self.onButton_Disc_Reset_EpisodeNumberPrecision)
+
+        self.lineEdit_Disc_Title.textChanged.connect(self.onUpdateSampleFilename)
+        self.comboBox_Disc_Mask.currentTextChanged.connect(self.onUpdateSampleFilename)
+        self.spinBox_Disc_FirstEpisode.valueChanged.connect(self.onUpdateSampleFilename)
+        self.spinBox_Disc_EpisodeNumberPrecision.valueChanged.connect(self.onUpdateSampleFilename)
 
         # Connect the widgets to the data items.
         # ======================================================================
@@ -698,6 +722,7 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             ['Select', 'Title #', 'Duration', 'Aspect', 'Title Name'])
 
         self.tableWidget_Disc_Titles.itemSelectionChanged.connect(self.onDisc_Titles_ItemSelectionChanged)
+        self.tableWidget_Disc_Titles.itemChanged.connect(self.onDisc_Titles_ItemChanged)
         # self.tableWidget_Disc_Titles.currentItemChanged.connect(self.onDisc_Titles_CurrentItemChanged)
 
         self.toolButton_DiscTitle_MoveBottom.clicked.connect(self.onButton_DiscTitle_MoveBottom)
@@ -978,6 +1003,15 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         AddItemToTableWidgetCell(self.tableWidget_DiscTitle_Episodes, row,
             self.TABLE_DISCTITLE_EPISODES_TITLE_COLUMN,
             episode.title, textAlignment=None)
+
+    def onAction_About(self):
+        """ Display the about dialog.
+        """
+        QMessageBox.about(self, 'About QHep', ('HandBrake Episode Processing\n'
+        'Version 2.0.1\n'
+        'Copyright 2017\n'
+        'David Price'
+        ))
 
     def onAction_Disc_Delete_Hash_Session(self):
         """ Delete the hash session file, if it exists.
@@ -2065,7 +2099,15 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         return (commandLines, chaptersFilenames)
 
     def onButton_MakeItSo_Run(self):
-        """ Preview the commands used to transcode each selected title.
+        """ Start transcoding the selected titles.
+
+            * Update the disc data from the widgets.
+            * Validate the data.
+            * Find the titles to transcode.
+            * Generate the transcoding commands and chapter files.
+            * Tell the user what we're doing.
+            * Disable the controls; No changes while transcoding.
+            * Start transcoding with a call to __transcode_nextTitle().
         """
         self.transferFromWindow()
 
@@ -2105,39 +2147,53 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
         self.__transcode_nextTitle()
 
-    # TODO Enhancement - on process kill, delete partial file
-
     def onButton_MakeItSo_Stop(self):
-
+        """ Stop transcoding because the user has cancelled it.
+        """
         self.resultsHtml.appendParagraph('Transcoding canceled by user', 'c0', self.transcodingLog)
         self.transcodingCommandsDeque.clear()
         self.transcodingProcess.kill()
-
-        # __transcode_complete() called by onTranscoding_errorOccurred() which is triggered by kill()
+        # __transcode_complete() is called by onTranscoding_errorOccurred() which is triggered by kill()
 
     def __transcode_nextTitle(self):
+        """ Start the next transcoding command on the stack.
+
+            * Create an new transcoding process and connect the signals.
+            * Pop the next transcoding command from the stack and generate the command line.
+            * Tell the user what we're doing.
+            * Start the process.
+        """
 
         self.transcodingProcess = QProcess(QApplication.instance())
         self.transcodingProcess.errorOccurred.connect(self.onTranscoding_errorOccurred)
         self.transcodingProcess.finished.connect(self.onTranscoding_finished)
         self.transcodingProcess.readyReadStandardError.connect(self.onTranscoding_readyReadStandardError)
         self.transcodingProcess.readyReadStandardOutput.connect(self.onTranscoding_readyReadStandardOutput)
-        # self.transcodingProcess.started.connect(self.onTranscoding_started)
-        # self.transcodingProcess.stateChanged.connect(self.onTranscoding_stateChanged)
 
         command = self.transcodingCommandsDeque.popleft()
+        commandLine = '{} {}'.format(self.preferences.executables.handBrakeCLI,
+            command)
 
         self.trancodingTitleStartTime = datetime.datetime.now()
         self.resultsHtml.appendParagraph('Title start @ {}'.format(
             self.trancodingTitleStartTime.strftime('%x %X')), 'c2',
             self.transcodingLog)
-
-        commandLine = '{} {}'.format(self.preferences.executables.handBrakeCLI,
-            command)
         self.resultsHtml.appendParagraph(commandLine, 'c3', self.transcodingLog)
+
         self.transcodingProcess.start(commandLine)
 
     def __transcode_complete(self):
+        """ This method is called by the transcoding QProcess when HandBrakeCLI
+            finishes transcoding a title.
+
+            * Tell the user transcoding has finished.
+            * Start the next transcoding job, if one exists.
+
+            If we're done:
+            * Enable the controls.
+            * Tell the user we're done.
+            * Clear the transcoding attributes.
+        """
 
         titleStopTime = datetime.datetime.now()
         self.resultsHtml.appendParagraph(('Title finished @ {}'
@@ -2237,17 +2293,18 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.statusBar.showMessage('Preview complete.', 15000)
 
     def onTranscoding_errorOccurred(self, error):
+        """ This method is called by the transcoding process when the
+            HandBrakeCLI crashes or is cancelled by the user.
+        """
         self.resultsHtml.appendParagraph('A process error has occured: {}'.format(
             TranslateProcessError(error)), 'c3', self.transcodingLog)
 
         self.__transcode_complete()
 
-    # TODO Route preview throuch makeItSo
-    # TODO about box
-    # TODO Transcoding method comments
-
     def onTranscoding_finished(self, exitCode, exitStatus):
-
+        """ This method is called by the transcoding process when the
+            HandBrakeCLI completes without crashing or being killed.
+        """
         if (exitCode):
             self.resultsHtml.appendParagraph(('WARNING!  Handbrake has '
                 'finished with error code {}!').format(exitCode), 'c0',
@@ -2257,18 +2314,22 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             self.__transcode_complete()
 
     def onTranscoding_readyReadStandardError(self):
+        """ This method is called by the transcoding process when the
+            HandBrakeCLI writes to the standard error output.
+
+            Echo the output from the HandBrakeCLI to the console stderr.
+        """
         sys.stderr.buffer.write(self.transcodingProcess.readAllStandardError())
         sys.stderr.flush()
 
     def onTranscoding_readyReadStandardOutput(self):
+        """ This method is called by the transcoding process when the
+            HandBrakeCLI writes to the standard output.
+
+            Echo the output from the HandBrakeCLI to the console stdout.
+        """
         sys.stdout.buffer.write(self.transcodingProcess.readAllStandardOutput())
         sys.stdout.flush()
-
-    # def onTranscoding_started(self):
-    #     print('onTranscoding_started')
-    #
-    # def onTranscoding_stateChanged(self, newState):
-    #     print('onTranscoding_stateChanged', newState)
 
     def discTitle_AudioTrackStatesToWidgets(self, title):
         """ Transfer the title data to the title audio track state widgets on
@@ -2444,6 +2505,20 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
     #         chapters radio button.
     #     """
 
+    def onDisc_Titles_ItemChanged(self, item):
+        """ Triggered when the data of item is changed.
+        """
+        if (item.column() != self.TABLE_DISC_TITLES_TITLE_NAME_COLUMN):
+            return
+
+        checkBox = self.tableWidget_Disc_Titles.cellWidget(item.row(),
+            self.TABLE_DISC_TITLES_SELECT_COLUMN).findChild(QCheckBox,
+            'checkBox_DiscTitle_SelectTitle')
+        if (not checkBox.isChecked()):
+            return
+
+        self.onUpdateSampleFilename()
+
     # def onDisc_Titles_CurrentItemChanged(self, currentItem, previousItem):
     #     """ Triggered when a new title is selected.
     #     """
@@ -2453,6 +2528,11 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
     #         print ('current', currentItem.row())
     #     if (previousItem):
     #         print ('previous', previousItem.row())
+
+    def onDisc_Titles_Checked(self, checked=False):
+        """ Triggered when a title checkbox is clicked.
+        """
+        self.enableWidgets_HasSelectedTitle()
 
     def onDisc_Titles_ItemSelectionChanged(self):
         """ Triggered when a new title is selected.
@@ -2466,6 +2546,87 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
 
         title = self.tableWidget_Disc_Titles.item(currentItem.row(), 0).data(Qt.UserRole)
         self.__titleDetailsToWidgets(title)
+
+    def onUpdateSampleFilename(self, parameter=None):
+        """ Update the sample filename in the statusbar whenever one of the
+            filename components change.
+        """
+        self.label_SampleFilename.setText('')
+
+        filenameTemplate = self.comboBox_Disc_Mask.currentText()
+        if (not filenameTemplate):
+            return
+
+        titleText, title = self.firstSelectedVisibleTitleInTitlesWidget()
+        if (not titleText):
+            return
+
+        episodeTitle = ''
+        if (title.chapterRanges.processChoice == ChapterRanges.PROCESS_EPISODES
+            and title.chapterRanges.hasEpisodes):
+            episodeTitle = title.chapterRanges.episodes[0].title
+
+        presetTag = ''
+        presetName = self.comboBox_Disc_Preset.currentText()
+        if (presetName and self.preferences.presets.hasName(presetName)):
+            presetTag = self.preferences.presets.getByName(presetName).tag
+
+        audioTags = self.sampleAudioTag()
+
+        filename = self.preferences.filenameTemplates.buildFilename(
+            filenameTemplate,
+            titleText,
+            presetTag,
+            audioTags,
+            '{0:0{1}d}'.format(self.spinBox_Disc_FirstEpisode.value(), self.spinBox_Disc_EpisodeNumberPrecision.value()),
+            titleText,
+            episodeTitle
+            )
+
+        self.label_SampleFilename.setText(filename)
+
+    def sampleAudioTag(self):
+        """ Returns the file name tag for the selected audio streams.
+        """
+        mixdownNames = []
+        tags = []
+
+        for audioTrackWidgets in self.__disc_audioTrackWidgets:
+            if (audioTrackWidgets.trackWidget.currentText()):
+                if (audioTrackWidgets.primaryMixdownWidget.currentText()):
+                    mixdownNames.append(audioTrackWidgets.primaryMixdownWidget.currentText())
+                if (audioTrackWidgets.secondaryMixdownWidget.currentText()):
+                    mixdownNames.append(audioTrackWidgets.secondaryMixdownWidget.currentText())
+
+        for mixdownName in mixdownNames:
+            if (self.preferences.mixdowns.hasName(mixdownName)):
+                tags.append(self.preferences.mixdowns.getByName(mixdownName).tag)
+
+
+        if (len(tags)):
+            return ','.join(tags)
+
+        return ''
+
+    def firstSelectedVisibleTitleInTitlesWidget(self):
+        """ Return the row and title for the first, selected, visible title in
+            the titles tableWidget.  Return None if nothing meets the requirements.
+        """
+        firstVisibleRow = None
+        for row in range(self.tableWidget_Disc_Titles.rowCount()):
+            title = self.tableWidget_Disc_Titles.item(row, 0).data(Qt.UserRole)
+            if (not title.visible):
+                continue
+
+            checkBox = self.tableWidget_Disc_Titles.cellWidget(row,
+                self.TABLE_DISC_TITLES_SELECT_COLUMN).findChild(QCheckBox,
+                'checkBox_DiscTitle_SelectTitle')
+            if (not checkBox.isChecked()):
+                continue
+
+            return (self.tableWidget_Disc_Titles.item(row, self.TABLE_DISC_TITLES_TITLE_NAME_COLUMN).text(), title)
+
+        return (None, None)
 
     def disc_Titles_GetVerticalHeadersVisible(self):
         """ Returns a named tupple:
@@ -2775,6 +2936,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.__disc_audioTrackWidgets.enableMixdowns()
         self.__disc_subtitleTrackWidgets.enableCheckBoxes()
 
+        self.onUpdateSampleFilename()
+
     def __loadSession(self, sessionFilename):
         """ Load the session information from a saved session file.
         """
@@ -2815,6 +2978,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
         self.enableWidgets_HasSelectedTitle()
         self.__disc_audioTrackWidgets.enableMixdowns()
         self.__disc_subtitleTrackWidgets.enableCheckBoxes()
+
+        self.onUpdateSampleFilename()
 
         self.statusBar.showMessage('Session loaded from "{}".'.format(sessionFilename), 15000)
         QApplication.beep()
@@ -2952,6 +3117,8 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
             checkBox = QCheckBox()
             checkBox.setObjectName('checkBox_DiscTitle_SelectTitle')
             checkBox.setChecked(title.selected)
+            checkBox.clicked.connect(self.onDisc_Titles_Checked)
+            checkBox.clicked.connect(self.onUpdateSampleFilename)
             layout = QHBoxLayout(widget)
             layout.addWidget(checkBox, alignment=Qt.AlignCenter)
             layout.setContentsMargins(0,0,0,0);
@@ -3034,12 +3201,15 @@ class MyMainWindow(QMainWindow, Ui_MainWindow, QRecentFiles):
     # TODO auto save sessions.
     # TODO Validate - only loop through the title list once during validation.
     # TODO need a way to highlight/clear fields/widgets.  Clearing the error is the hard part.
-    # TODO resolve data transfer, enable/disable conflict between data/widget connectors and widget collection classes like this one.
+    # TODO resolve data transfer, enable/disable conflict between data/widget connectors and widget collection classes.
     # TODO @abstactmethod
-    # TODO Window modified mechanism?
     # TODO Refactor - Create a base class for audio and subtitle track states?
     # TODO Refactor - Create a filename template class?
     # TODO add button (buttons?) in preferences dialog to reset stuff to their defaults.
+    # TODO Route preview through makeItSo
+    # TODO Enhancement - Pause running transcode
+    # TODO Enhancement - on process kill, delete partial file
+    # TODO set runtime priority for HandBrakeCLI
 
     def validate_Disc_AudioTrackStates(self):
         """ Check the disc level audio track states for the following:
